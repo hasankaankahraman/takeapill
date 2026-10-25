@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/notifications/notification_planner.dart';
 import '../core/notifications/notification_service.dart';
+import '../core/review.dart';
 import '../core/settings_store.dart';
 import '../features/schedule/domain/schedule_models.dart';
 import 'form_rows.dart';
@@ -219,6 +220,29 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                     style: TextStyle(fontSize: 12, color: c.warn),
                   ),
                 ),
+              if (canOpenStoreListing) ...[
+                const SectionLabel('Destek'),
+                GroupPanel(
+                  children: [
+                    PanelRow(
+                      leading: Icon(Icons.star_outline_rounded, color: c.muted),
+                      title: 'Uygulamayı değerlendir',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: c.muted,
+                      ),
+                      onTap: () async {
+                        try {
+                          await openStoreListing();
+                        } catch (e) {
+                          debugPrint('Mağaza sayfası açılamadı: $e');
+                          if (mounted) _snack('Mağaza sayfası açılamadı.');
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(14),

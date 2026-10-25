@@ -17,6 +17,8 @@ abstract final class SettingKeys {
   static const snoozes = 'notif.snoozes';
   static const onboarded = 'onboarded';
   static const themeMode = 'theme.mode';
+  static const reviewAskedAt = 'review.askedAt';
+  static const reviewAskCount = 'review.count';
 }
 
 extension SettingsAccess on AppDatabase {

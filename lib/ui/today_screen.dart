@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../core/labels.dart';
+import '../core/review.dart';
 import '../features/schedule/data/schedule_repository.dart';
 import '../features/schedule/domain/schedule_models.dart';
 import 'providers.dart';
@@ -219,6 +220,11 @@ class _DoseCard extends ConsumerWidget {
     final med = view.medication;
     final expanded = overdue || isNext;
 
+    Future<void> take() async {
+      await markDose(db, view, DoseStatus.taken);
+      await maybeRequestReview(db);
+    }
+
     final info = Row(
       children: [
         MedBadge(color: med.color),
@@ -285,7 +291,7 @@ class _DoseCard extends ConsumerWidget {
               shape: const CircleBorder(),
             ),
             icon: const Icon(Icons.check_rounded, size: 22),
-            onPressed: () => markDose(db, view, DoseStatus.taken),
+            onPressed: take,
           ),
       ],
     );
@@ -329,7 +335,7 @@ class _DoseCard extends ConsumerWidget {
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(46),
                           ),
-                          onPressed: () => markDose(db, view, DoseStatus.taken),
+                          onPressed: take,
                           icon: const Icon(Icons.check_rounded, size: 20),
                           label: const Text('Aldım'),
                         ),

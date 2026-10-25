@@ -327,13 +327,16 @@ class ChoicePill extends StatelessWidget {
             height: circle ? 42 : 38,
             width: circle ? 42 : null,
             padding: circle ? null : const EdgeInsets.symmetric(horizontal: 14),
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: circle ? 12 : 14,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                color: selected ? c.onAccent : c.ink,
+            // widthFactor: Wrap içinde satırın tamamına yayılmasın.
+            child: Center(
+              widthFactor: 1,
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: circle ? 12 : 14,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: selected ? c.onAccent : c.ink,
+                ),
               ),
             ),
           ),

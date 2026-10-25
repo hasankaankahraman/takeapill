@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -15,7 +16,7 @@ class HistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final now = DateTime.now();
+    final now = clock.now();
     final from = DateTime(now.year, now.month, now.day - (_days - 1));
     // Anahtar gün içinde sabit kalmalı; yoksa her çizimde yeni sorgu açılır.
     final to = DateTime(now.year, now.month, now.day + 1);

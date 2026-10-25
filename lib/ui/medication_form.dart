@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -76,7 +77,7 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
   bool _saving = false;
 
   static DateTime _today() {
-    final n = DateTime.now();
+    final n = clock.now();
     return DateTime(n.year, n.month, n.day);
   }
 

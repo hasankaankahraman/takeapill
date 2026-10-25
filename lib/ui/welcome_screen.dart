@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/notifications/notification_service.dart';
 import '../core/settings_store.dart';
+import 'onboarding_animation.dart';
 import 'providers.dart';
 import 'theme.dart';
 
@@ -15,12 +16,11 @@ class WelcomeScreen extends ConsumerWidget {
     final c = context.c;
     return Scaffold(
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, box) => SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 32, 24, 16),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: box.maxHeight - 48),
-              child: IntrinsicHeight(
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -44,11 +44,13 @@ class WelcomeScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 20),
+                    const PillStoryAnimation(),
+                    const SizedBox(height: 20),
                     Text(
-                      'İlaçlarını\nunutma.',
+                      'İlaçlarını unutma.',
                       style: Theme.of(context).textTheme.headlineLarge
-                          ?.copyWith(fontSize: 38, height: 1.1),
+                          ?.copyWith(fontSize: 32, height: 1.1),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -80,31 +82,32 @@ class WelcomeScreen extends ConsumerWidget {
                       fg: c.warn,
                       text: 'Bir hatırlatıcıdır, tıbbi tavsiye vermez',
                     ),
-                    const Spacer(),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(56),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                        ),
-                        onPressed: () async {
-                          final db = ref.read(dbProvider);
-                          await NotificationService.requestPermissions();
-                          await db.setSetting(SettingKeys.onboarded, '1');
-                          if (context.mounted) context.go('/');
-                        },
-                        child: const Text('Başla ve bildirimlere izin ver'),
-                      ),
-                    ),
                   ],
                 ),
               ),
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                  ),
+                  onPressed: () async {
+                    final db = ref.read(dbProvider);
+                    await NotificationService.requestPermissions();
+                    await db.setSetting(SettingKeys.onboarded, '1');
+                    if (context.mounted) context.go('/');
+                  },
+                  child: const Text('Başla ve bildirimlere izin ver'),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

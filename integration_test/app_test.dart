@@ -48,6 +48,8 @@ void main() {
     // --- Karşılama + izin ---
     expect(find.text('Take a Pill'), findsOneWidget);
     await shot(t, '10_welcome');
+    await t.ensureVisible(find.text('Başla ve bildirimlere izin ver'));
+    await settle(t, 2);
     await t.tap(find.text('Başla ve bildirimlere izin ver'));
     await settle(t, 10);
     expect(find.textContaining('planlı ilaç yok'), findsOneWidget);

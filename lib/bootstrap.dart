@@ -15,6 +15,11 @@ import 'ui/providers.dart';
 Future<Widget> bootstrap({AppDatabase? db}) async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('tr');
+  // Yalnızca dikey; iOS'ta Info.plist de aynı kısıtı taşır.
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   // Liquid glass yalnızca iOS'ta; Android'de alt menü düz bulanık şerit.
   final glass = defaultTargetPlatform == TargetPlatform.iOS;
   if (glass) {

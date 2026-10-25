@@ -50,6 +50,10 @@ flutter drive --driver=test_driver/integration_test.dart \
 Mağaza görselleri: `flutter test tool/store/store_assets_test.dart` ve ardından
 `tool/store/finalize.sh` (çıktılar `store/` altında).
 
+Mağaza metinleri (ad, alt başlık, anahtar kelimeler, açıklamalar) fastlane
+yapısında `store/app-store/metadata/tr/` ve `store/google-play/metadata/tr-TR/`
+altında; karakter sınırlarını `flutter test tool/store/metadata_test.dart` denetler.
+
 ## Yayın
 
 Sürüm `pubspec.yaml` içindeki `version: x.y.z+build` satırından gelir; her

@@ -10,7 +10,7 @@ find store -name '*.png' ! -name 'icon-512.png' | while read -r png; do
 done
 sips -z 512 512 assets/icon/icon.png --out store/google-play/icon-512.png >/dev/null
 
-find store -type f | sort | while read -r f; do
+find store -type f \( -name '*.jpg' -o -name '*.png' \) | sort | while read -r f; do
   printf '%s  %sx%s\n' "$f" \
     "$(sips -g pixelWidth "$f" | awk '/pixelWidth/ {print $2}')" \
     "$(sips -g pixelHeight "$f" | awk '/pixelHeight/ {print $2}')"

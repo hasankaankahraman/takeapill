@@ -11,6 +11,7 @@ import 'package:takeapill/core/db/app_database.dart';
 import 'package:takeapill/core/settings_store.dart';
 import 'package:takeapill/features/schedule/domain/rule_codec.dart';
 import 'package:takeapill/features/schedule/domain/schedule_models.dart';
+import 'package:takeapill/ui/widgets.dart';
 
 import '../helpers/fake_notifications.dart';
 
@@ -107,22 +108,30 @@ void main() {
       await settle(t);
       expect(find.text('İlaç adı gerekli'), findsOneWidget);
 
+      await t.enterText(find.byKey(const ValueKey('name')), 'Metformin');
+      await settle(t);
+      expect(find.text('İlaç adı gerekli'), findsNothing);
+
       // Tarih seçici Türkçe
       await t.scrollUntilVisible(
         find.text('Başlangıç'),
         200,
-        scrollable: find.byType(Scrollable).first,
+        // Formun listesi; metin alanlarının kendi kaydırıcıları değil.
+        scrollable: find
+            .ancestor(
+              of: find.byKey(const ValueKey('name')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
+      await t.ensureVisible(find.text('Başlangıç'));
+      await settle(t);
       await t.tap(find.text('Başlangıç'));
       await settle(t);
       expect(find.text('İptal'), findsOneWidget);
       await t.tap(find.text('İptal'));
       await settle(t);
 
-      await t.enterText(
-        find.widgetWithText(TextFormField, 'İlaç adı'),
-        'Metformin',
-      );
       await t.tap(find.text('Kaydet').first);
       await settle(t);
 
@@ -225,6 +234,49 @@ void main() {
       await settle(t);
       expect(find.text('Yeni ilaç'), findsOneWidget);
       await finish(t, db);
+    });
+  });
+  testWidgets('başlık ve buton her sekmede aynı pikselde durur', (t) async {
+    await withClock(Clock.fixed(DateTime(2026, 11, 2, 7, 30)), () async {
+      // Boş liste: İlaçlar'da bilgi satırı yok; yine de başlık kaymamalı.
+      for (final slots in [
+        <int>[],
+        [8 * 60],
+      ]) {
+        final db = await t.runAsync(() async {
+          final db = await seeded(slots);
+          if (slots.isEmpty) await db.deleteMedication(1);
+          return db;
+        }) as AppDatabase;
+        await start(t, db: db);
+        final titles = <Rect>[];
+        final buttons = <Rect>[];
+        for (final (tab, title) in [
+          ('Bugün', 'Bugün'),
+          ('İlaçlar', 'İlaçlarım'),
+          ('Geçmiş', 'Geçmiş'),
+          ('Ayarlar', 'Ayarlar'),
+        ]) {
+          await t.tap(find.text(tab).last);
+          await settle(t);
+          titles.add(
+            t.getRect(
+              find.descendant(
+                of: find.byType(PageHeader),
+                matching: find.text(title),
+              ),
+            ),
+          );
+          final add = find.byType(AddButton);
+          if (add.evaluate().isNotEmpty) buttons.add(t.getRect(add));
+        }
+        for (final r in titles.skip(1)) {
+          expect(r.topLeft, titles.first.topLeft);
+        }
+        expect(buttons, hasLength(2));
+        expect(buttons.last, buttons.first);
+        await finish(t, db);
+      }
     });
   });
 }

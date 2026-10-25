@@ -1,14 +1,72 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
-/// Saat seçiciyi açar; seçilen saati gece yarısından itibaren dakika döner.
+/// Android saat diyaloğu; seçilen saati gece yarısından itibaren dakika döner.
+/// iOS'ta saat satır içi çarkla seçilir (bkz. TimeRow).
 Future<int?> pickMinutes(BuildContext context, int current) async {
   final t = await showTimePicker(
     context: context,
     initialTime: TimeOfDay(hour: (current ~/ 60) % 24, minute: current % 60),
   );
   return t == null ? null : t.hour * 60 + t.minute;
+}
+
+/// Android takvim diyaloğu.
+Future<DateTime?> pickDate(BuildContext context, DateTime initial) =>
+    showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+
+/// Türkçe büyük harf: "i" → "İ", "ı" → "I" (Dart'ın toUpperCase'i bilmez).
+String upperTr(String s) =>
+    s.replaceAll('i', 'İ').replaceAll('ı', 'I').toUpperCase();
+
+/// Onay penceresi; iOS'ta Cupertino uyarısı olarak açılır.
+Future<bool?> confirmDialog(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirm,
+  bool destructive = false,
+}) {
+  final apple = isApple(context);
+  final c = context.c;
+  final error = Theme.of(context).colorScheme.error;
+  Widget action(
+    BuildContext dc,
+    String label,
+    bool value, {
+    bool main = false,
+  }) => apple
+      ? CupertinoDialogAction(
+          isDestructiveAction: main && destructive,
+          isDefaultAction: !main,
+          onPressed: () => Navigator.pop(dc, value),
+          child: Text(label),
+        )
+      : TextButton(
+          style: main && destructive
+              ? TextButton.styleFrom(foregroundColor: error)
+              : null,
+          onPressed: () => Navigator.pop(dc, value),
+          child: Text(label),
+        );
+  return showAdaptiveDialog<bool>(
+    context: context,
+    builder: (dc) => AlertDialog.adaptive(
+      title: Text(title),
+      content: Text(message, style: apple ? null : TextStyle(color: c.muted)),
+      actions: [
+        action(dc, 'Vazgeç', false),
+        action(dc, confirm, true, main: true),
+      ],
+    ),
+  );
 }
 
 /// Sekme ekranlarının büyük başlığı: üstte küçük harfli bilgi, altında başlık.
@@ -28,7 +86,7 @@ class PageHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -36,20 +94,26 @@ class PageHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (eyebrow != null)
-                  Text(
-                    eyebrow!.toUpperCase(),
+                // Bilgi satırı boşken de yeri korunur; sekmeler arasında
+                // başlık ve buton aynı pikselde kalsın.
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    upperTr(eyebrow ?? ''),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0.3,
+                      letterSpacing: 0.8,
                       color: c.muted,
                     ),
                   ),
+                ),
                 Text(
                   title,
                   style: Theme.of(context).textTheme.headlineLarge
-                      ?.copyWith(fontSize: 30),
+                      ?.copyWith(fontSize: 32, height: 1.15),
                 ),
               ],
             ),
@@ -61,6 +125,33 @@ class PageHeader extends StatelessWidget {
   }
 }
 
+/// Başlık satırındaki yuvarlak "ilaç ekle" butonu.
+class AddButton extends StatelessWidget {
+  const AddButton({super.key, required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return IconButton.filled(
+      tooltip: 'İlaç ekle',
+      style: IconButton.styleFrom(
+        backgroundColor: c.primary,
+        foregroundColor: c.onPrimary,
+        fixedSize: const Size(44, 44),
+        shape: const CircleBorder(),
+      ),
+      icon: Icon(isApple(context) ? CupertinoIcons.add : Icons.add_rounded),
+      onPressed: onPressed,
+    );
+  }
+}
+
+/// Sekme ekranlarındaki listelerin altı; yüzen menünün altında kalmasın.
+EdgeInsets listPadding(BuildContext context, {double top = 0}) =>
+    EdgeInsets.fromLTRB(20, top, 20, 24 + MediaQuery.paddingOf(context).bottom);
+
 class SectionLabel extends StatelessWidget {
   const SectionLabel(this.text, {super.key, this.padding});
 
@@ -69,26 +160,27 @@ class SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: padding ?? const EdgeInsets.fromLTRB(4, 20, 4, 10),
+    padding: padding ?? const EdgeInsets.fromLTRB(4, 24, 4, 10),
     child: Text(
-      text.toUpperCase(),
+      upperTr(text),
       style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.5,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.8,
         color: context.c.muted,
       ),
     ),
   );
 }
 
-/// Yuvarlatılmış beyaz yüzey.
+/// İnce çerçeveli yüzey.
 class Panel extends StatelessWidget {
   const Panel({
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.color,
+    this.borderColor,
     this.onTap,
     this.highlight = false,
   });
@@ -96,20 +188,20 @@ class Panel extends StatelessWidget {
   final Widget child;
   final EdgeInsets padding;
   final Color? color;
+  final Color? borderColor;
   final VoidCallback? onTap;
   final bool highlight;
 
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final radius = BorderRadius.circular(20);
     return Material(
       color: color ?? c.surface,
       shape: RoundedRectangleBorder(
-        borderRadius: radius,
+        borderRadius: BorderRadius.circular(18),
         side: highlight
-            ? BorderSide(color: c.accent, width: 2)
-            : BorderSide.none,
+            ? BorderSide(color: c.accent, width: 1.5)
+            : BorderSide(color: borderColor ?? c.line),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -132,7 +224,7 @@ class GroupPanel extends StatelessWidget {
     child: Column(
       children: [
         for (var i = 0; i < children.length; i++) ...[
-          if (i > 0) const Divider(indent: 16, endIndent: 16),
+          if (i > 0) const Divider(indent: 16),
           children[i],
         ],
       ],
@@ -170,7 +262,7 @@ class PanelRow extends StatelessWidget {
                 title,
                 style: const TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -195,13 +287,14 @@ class Tag extends StatelessWidget {
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
       color: color ?? context.c.chip,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
     ),
     child: Text(
       text,
       style: TextStyle(
         fontSize: 12,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w600,
+        fontFeatures: const [FontFeature.tabularFigures()],
         color: textColor ?? context.c.ink,
       ),
     ),
@@ -223,15 +316,15 @@ class MedBadge extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(size * 0.32),
+        borderRadius: BorderRadius.circular(size * 0.3),
       ),
-      child: Icon(Icons.medication_rounded, color: fg, size: size * 0.52),
+      child: Icon(Icons.medication_outlined, color: fg, size: size * 0.5),
     );
   }
 }
 
 /// Seçili öğesi beyaz "kaydırıcı" olan bölümlü seçici.
-class Segmented<T> extends StatelessWidget {
+class Segmented<T extends Object> extends StatelessWidget {
   const Segmented({
     super.key,
     required this.options,
@@ -247,11 +340,38 @@ class Segmented<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.c;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    if (isApple(context)) {
+      return CupertinoSlidingSegmentedControl<T>(
+        groupValue: selected,
+        backgroundColor: Color.alphaBlend(c.ink.withValues(alpha: 0.06), c.bg),
+        thumbColor: dark ? c.chip : c.surface,
+        padding: const EdgeInsets.all(3),
+        onValueChanged: (v) {
+          if (v != null) onChanged(v);
+        },
+        children: {
+          for (final e in options.entries)
+            e.key: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                e.value,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: e.key == selected
+                      ? FontWeight.w600
+                      : FontWeight.w500,
+                  color: c.ink,
+                ),
+              ),
+            ),
+        },
+      );
+    }
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: dark ? c.chip : const Color(0xFFE9EBF2),
-        borderRadius: BorderRadius.circular(16),
+        color: Color.alphaBlend(c.ink.withValues(alpha: 0.06), c.bg),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
@@ -265,18 +385,18 @@ class Segmented<T> extends StatelessWidget {
                   onTap: () => onChanged(e.key),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    height: 40,
+                    height: 38,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: e.key == selected
-                          ? (dark ? c.surface : Colors.white)
+                          ? (dark ? c.chip : c.surface)
                           : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(9),
                       boxShadow: e.key == selected && !dark
                           ? const [
                               BoxShadow(
-                                color: Color(0x1A12131A),
-                                blurRadius: 3,
+                                color: Color(0x14000000),
+                                blurRadius: 4,
                                 offset: Offset(0, 1),
                               ),
                             ]
@@ -287,8 +407,8 @@ class Segmented<T> extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: e.key == selected
-                            ? FontWeight.w700
-                            : FontWeight.w600,
+                            ? FontWeight.w600
+                            : FontWeight.w500,
                         color: e.key == selected ? c.ink : c.muted,
                       ),
                     ),
@@ -320,21 +440,24 @@ class ChoicePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
+    final shape = circle
+        ? CircleBorder(side: BorderSide(color: selected ? c.primary : c.line))
+        : RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: selected ? c.primary : c.line),
+          );
     return Semantics(
       button: true,
       selected: selected,
       child: Material(
-        color: selected ? c.accent : c.chip,
-        shape: circle
-            ? const CircleBorder()
-            : RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        color: selected ? c.primary : c.surface,
+        shape: shape,
         child: InkWell(
-          customBorder: circle ? const CircleBorder() : null,
-          borderRadius: circle ? null : BorderRadius.circular(12),
+          customBorder: shape,
           onTap: onTap,
           child: Container(
-            height: circle ? 42 : 38,
-            width: circle ? 42 : null,
+            height: circle ? 40 : 36,
+            width: circle ? 40 : null,
             padding: circle ? null : const EdgeInsets.symmetric(horizontal: 14),
             // widthFactor: Wrap içinde satırın tamamına yayılmasın.
             child: Center(
@@ -343,8 +466,8 @@ class ChoicePill extends StatelessWidget {
                 label,
                 style: TextStyle(
                   fontSize: circle ? 12 : 14,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                  color: selected ? c.onAccent : c.ink,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  color: selected ? c.onPrimary : c.ink,
                 ),
               ),
             ),
@@ -379,25 +502,26 @@ class EmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 72,
-              height: 72,
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
-                color: c.accentSoft,
-                borderRadius: BorderRadius.circular(24),
+                color: c.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: c.line),
               ),
-              child: Icon(icon, size: 34, color: c.onAccentSoft),
+              child: Icon(icon, size: 28, color: c.ink),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: c.muted, height: 1.4),
+              style: TextStyle(fontSize: 14, color: c.muted, height: 1.45),
             ),
             if (action != null) ...[const SizedBox(height: 20), action!],
           ],
@@ -405,6 +529,15 @@ class EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Platforma uygun yükleniyor göstergesi.
+class Loading extends StatelessWidget {
+  const Loading({super.key});
+
+  @override
+  Widget build(BuildContext context) =>
+      const Center(child: CircularProgressIndicator.adaptive());
 }
 
 /// Veri yüklenemediğinde; ham hata metni kullanıcıya gösterilmez.

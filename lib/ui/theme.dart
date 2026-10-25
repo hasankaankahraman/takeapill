@@ -1,16 +1,21 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// Tasarım token'ları (Design tuvalindeki renkler). Material ColorScheme'in
-/// karşılamadığı yumuşak tonlar burada tutulur.
+/// Tasarım token'ları. Zemin nötr grafit; ana eylemler mürekkep rengi,
+/// vurgu (ilerleme, sıradaki doz, alındı) petrol yeşili.
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
   const AppColors({
     required this.bg,
     required this.surface,
+    required this.glass,
     required this.ink,
     required this.muted,
     required this.line,
     required this.chip,
+    required this.primary,
+    required this.onPrimary,
     required this.accent,
     required this.onAccent,
     required this.accentSoft,
@@ -24,10 +29,17 @@ class AppColors extends ThemeExtension<AppColors> {
 
   final Color bg;
   final Color surface;
+
+  /// Yarı saydam çubukların (Android alt menü) dolgusu.
+  final Color glass;
   final Color ink;
   final Color muted;
   final Color line;
   final Color chip;
+
+  /// Dolu butonlar ve seçili öğeler.
+  final Color primary;
+  final Color onPrimary;
   final Color accent;
   final Color onAccent;
   final Color accentSoft;
@@ -39,39 +51,45 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color ok;
 
   static const light = AppColors(
-    bg: Color(0xFFF5F6FA),
+    bg: Color(0xFFF4F4F5),
     surface: Color(0xFFFFFFFF),
-    ink: Color(0xFF12131A),
-    muted: Color(0xFF5C6070),
-    line: Color(0xFFEEF0F4),
-    chip: Color(0xFFF0F1F5),
-    accent: Color(0xFF4F46E5),
+    glass: Color(0xB8FFFFFF),
+    ink: Color(0xFF111113),
+    muted: Color(0xFF6B6B73),
+    line: Color(0xFFE4E4E7),
+    chip: Color(0xFFF0F0F2),
+    primary: Color(0xFF18181B),
+    onPrimary: Color(0xFFFFFFFF),
+    accent: Color(0xFF0F766E),
     onAccent: Color(0xFFFFFFFF),
-    accentSoft: Color(0xFFEEF0FF),
-    onAccentSoft: Color(0xFF4F46E5),
+    accentSoft: Color(0xFFE3F1EE),
+    onAccentSoft: Color(0xFF0B5C55),
     warn: Color(0xFFB4470A),
-    warnSoft: Color(0xFFFFEBDD),
-    note: Color(0xFFFFF7E6),
-    onNote: Color(0xFF5A4410),
-    ok: Color(0xFF0F7A57),
+    warnSoft: Color(0xFFFBEDE3),
+    note: Color(0xFFF7F6F2),
+    onNote: Color(0xFF57534E),
+    ok: Color(0xFF15803D),
   );
 
   static const dark = AppColors(
-    bg: Color(0xFF0E0F14),
-    surface: Color(0xFF181A22),
-    ink: Color(0xFFF2F3F7),
-    muted: Color(0xFFA0A4B3),
-    line: Color(0xFF262938),
-    chip: Color(0xFF242733),
-    accent: Color(0xFF8B87FF),
-    onAccent: Color(0xFF0E0F14),
-    accentSoft: Color(0xFF25244A),
-    onAccentSoft: Color(0xFFC7C4FF),
-    warn: Color(0xFFFFA36B),
-    warnSoft: Color(0xFF3A2416),
-    note: Color(0xFF2E2614),
-    onNote: Color(0xFFF1DDAE),
-    ok: Color(0xFF5FD3A6),
+    bg: Color(0xFF09090B),
+    surface: Color(0xFF161618),
+    glass: Color(0xB8161618),
+    ink: Color(0xFFF4F4F5),
+    muted: Color(0xFF9C9CA5),
+    line: Color(0xFF27272A),
+    chip: Color(0xFF212124),
+    primary: Color(0xFFF4F4F5),
+    onPrimary: Color(0xFF111113),
+    accent: Color(0xFF3CCFB9),
+    onAccent: Color(0xFF062A26),
+    accentSoft: Color(0xFF10302C),
+    onAccentSoft: Color(0xFF8EE6D7),
+    warn: Color(0xFFFB923C),
+    warnSoft: Color(0xFF33200F),
+    note: Color(0xFF1C1B19),
+    onNote: Color(0xFFD6D3CC),
+    ok: Color(0xFF4ADE80),
   );
 
   @override
@@ -85,6 +103,10 @@ extension AppColorsX on BuildContext {
   AppColors get c => Theme.of(this).extension<AppColors>()!;
 }
 
+/// iOS'ta Cupertino kontrolleri ve liquid glass, Android'de Material kullanılır.
+bool isApple(BuildContext context) =>
+    Theme.of(context).platform == TargetPlatform.iOS;
+
 /// İlacın kendi renginden ikon zemini ve ikon rengi üretir.
 (Color bg, Color fg) medTint(BuildContext context, int argb) {
   final dark = Theme.of(context).brightness == Brightness.dark;
@@ -92,7 +114,7 @@ extension AppColorsX on BuildContext {
   final fg = dark
       ? hsl.withLightness((hsl.lightness + 0.2).clamp(0, 0.78)).toColor()
       : hsl.withLightness((hsl.lightness - 0.15).clamp(0.22, 1)).toColor();
-  final bg = Color(argb).withValues(alpha: dark ? 0.22 : 0.14);
+  final bg = Color(argb).withValues(alpha: dark ? 0.2 : 0.12);
   return (bg, fg);
 }
 
@@ -100,42 +122,68 @@ const fontFamily = 'PlusJakartaSans';
 
 ThemeData buildTheme(Brightness brightness) {
   final c = brightness == Brightness.dark ? AppColors.dark : AppColors.light;
+  final apple = defaultTargetPlatform == TargetPlatform.iOS;
+  // Monokrom tohum: seçiciler ve menüler gibi Material yüzeylerine mor
+  // tonlar sızmasın.
   final scheme =
       ColorScheme.fromSeed(
-        seedColor: const Color(0xFF4F46E5),
+        seedColor: c.accent,
         brightness: brightness,
+        dynamicSchemeVariant: DynamicSchemeVariant.monochrome,
       ).copyWith(
-        primary: c.accent,
-        onPrimary: c.onAccent,
+        primary: c.primary,
+        onPrimary: c.onPrimary,
         primaryContainer: c.accentSoft,
         onPrimaryContainer: c.onAccentSoft,
+        secondary: c.accent,
+        onSecondary: c.onAccent,
+        tertiary: c.accent,
         surface: c.bg,
         onSurface: c.ink,
         onSurfaceVariant: c.muted,
+        surfaceContainerLowest: c.surface,
+        surfaceContainerLow: c.surface,
+        surfaceContainer: c.surface,
         surfaceContainerHigh: c.surface,
+        surfaceContainerHighest: c.chip,
+        outline: c.muted,
         outlineVariant: c.line,
+        surfaceTint: Colors.transparent,
       );
   final base = ThemeData(
     useMaterial3: true,
     brightness: brightness,
     colorScheme: scheme,
     fontFamily: fontFamily,
+    // iOS'ta dalga efekti yok; basılı hâl hafif bir gölgeyle belli olur.
+    splashFactory: apple ? NoSplash.splashFactory : null,
+    highlightColor: apple ? c.ink.withValues(alpha: 0.05) : null,
   );
   final text = base.textTheme.apply(bodyColor: c.ink, displayColor: c.ink);
-  final shape14 = RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(14),
+  final shape12 = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(12),
   );
+  OutlineInputBorder border(Color color, [double width = 1]) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: color, width: width),
+      );
 
   return base.copyWith(
     extensions: [c],
     scaffoldBackgroundColor: c.bg,
+    cupertinoOverrideTheme: CupertinoThemeData(
+      brightness: brightness,
+      primaryColor: c.accent,
+      scaffoldBackgroundColor: c.bg,
+    ),
     textTheme: text.copyWith(
       headlineLarge: text.headlineLarge?.copyWith(
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.6,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.9,
       ),
       titleLarge: text.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-      titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+      titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w600),
       bodyLarge: text.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
     ),
     appBarTheme: AppBarTheme(
@@ -146,7 +194,8 @@ ThemeData buildTheme(Brightness brightness) {
       titleTextStyle: TextStyle(
         fontFamily: fontFamily,
         fontSize: 17,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.2,
         color: c.ink,
       ),
     ),
@@ -154,98 +203,93 @@ ThemeData buildTheme(Brightness brightness) {
       elevation: 0,
       color: c.surface,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: c.line),
+      ),
     ),
     dividerTheme: DividerThemeData(color: c.line, space: 1, thickness: 1),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: c.ink),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: c.chip,
-      labelStyle: TextStyle(color: c.muted, fontWeight: FontWeight.w600),
-      floatingLabelStyle: TextStyle(
-        color: c.accent,
-        fontWeight: FontWeight.w700,
-      ),
+      labelStyle: TextStyle(color: c.muted, fontWeight: FontWeight.w500),
+      floatingLabelStyle: TextStyle(color: c.ink, fontWeight: FontWeight.w600),
+      hintStyle: TextStyle(color: c.muted.withValues(alpha: 0.7)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide.none,
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide.none,
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: c.accent, width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: scheme.error, width: 1.5),
-      ),
+      border: border(Colors.transparent),
+      enabledBorder: border(Colors.transparent),
+      focusedBorder: border(c.ink, 1.2),
+      errorBorder: border(scheme.error, 1.2),
+      focusedErrorBorder: border(scheme.error, 1.5),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: c.accent,
-        foregroundColor: c.onAccent,
+        backgroundColor: c.primary,
+        foregroundColor: c.onPrimary,
         minimumSize: const Size(44, 48),
-        shape: shape14,
+        shape: shape12,
+        elevation: 0,
         textStyle: const TextStyle(
           fontFamily: fontFamily,
           fontSize: 15,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
         ),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: c.accent,
-        shape: shape14,
+        foregroundColor: c.ink,
+        shape: shape12,
         textStyle: const TextStyle(
           fontFamily: fontFamily,
           fontSize: 15,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    ),
-    floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: c.accent,
-      foregroundColor: c.onAccent,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      extendedTextStyle: const TextStyle(
-        fontFamily: fontFamily,
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: c.surface,
-      indicatorColor: c.accentSoft,
-      elevation: 0,
-      height: 68,
-      iconTheme: WidgetStateProperty.resolveWith(
-        (s) => IconThemeData(
-          color: s.contains(WidgetState.selected) ? c.onAccentSoft : c.muted,
-        ),
-      ),
-      labelTextStyle: WidgetStateProperty.resolveWith(
-        (s) => TextStyle(
-          fontFamily: fontFamily,
-          fontSize: 12,
-          fontWeight: s.contains(WidgetState.selected)
-              ? FontWeight.w700
-              : FontWeight.w600,
-          color: s.contains(WidgetState.selected) ? c.onAccentSoft : c.muted,
+          fontWeight: FontWeight.w600,
         ),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      shape: shape14,
+      backgroundColor: c.primary,
+      contentTextStyle: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: c.onPrimary,
+      ),
+      elevation: 0,
+      shape: shape12,
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: c.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: c.surface,
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: c.line),
+      ),
+    ),
+    datePickerTheme: DatePickerThemeData(
+      backgroundColor: c.surface,
+      elevation: 0,
+      headerBackgroundColor: c.surface,
+      headerForegroundColor: c.ink,
+      dividerColor: c.line,
+    ),
+    timePickerTheme: TimePickerThemeData(
+      backgroundColor: c.surface,
+      elevation: 0,
+      dialBackgroundColor: c.chip,
+      hourMinuteColor: WidgetStateColor.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? c.primary : c.chip,
+      ),
+      hourMinuteTextColor: WidgetStateColor.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? c.onPrimary : c.ink,
+      ),
     ),
   );
 }

@@ -30,7 +30,7 @@ class HistoryScreen extends ConsumerWidget {
             const PageHeader(eyebrow: 'Son $_days gün', title: 'Geçmiş'),
             Expanded(
               child: doses.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Loading(),
                 error: (e, _) => LoadError(error: e),
                 data: (all) {
                   final list = [
@@ -55,7 +55,7 @@ class HistoryScreen extends ConsumerWidget {
                   final days = byDay.keys.toList()
                     ..sort((a, b) => b.compareTo(a));
                   return ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                    padding: listPadding(context),
                     children: [
                       _AdherenceCard(list: list, byDay: byDay, now: now),
                       for (final day in days) ...[
@@ -104,7 +104,7 @@ class HistoryScreen extends ConsumerWidget {
         '${fmtTime(v.dose.scheduledAt)} · $label',
         style: TextStyle(
           fontSize: 13,
-          fontWeight: missed ? FontWeight.w700 : FontWeight.w600,
+          fontWeight: missed ? FontWeight.w600 : FontWeight.w500,
           color: missed ? c.warn : c.muted,
         ),
       ),
@@ -131,14 +131,8 @@ class _AdherenceCard extends StatelessWidget {
     final week = [
       for (var i = 6; i >= 0; i--) DateTime(now.year, now.month, now.day - i),
     ];
-    final soft = c.onAccent.withValues(alpha: 0.78);
-
-    return Container(
+    return Panel(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: c.accent,
-        borderRadius: BorderRadius.circular(24),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -153,18 +147,18 @@ class _AdherenceCard extends StatelessWidget {
                       'Uyum oranı',
                       style: TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: soft,
+                        fontWeight: FontWeight.w500,
+                        color: c.muted,
                       ),
                     ),
                     Text(
                       '%$pct',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 40,
                         height: 1.1,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.8,
-                        color: c.onAccent,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -1.2,
+                        fontFeatures: [FontFeature.tabularFigures()],
                       ),
                     ),
                   ],
@@ -175,15 +169,15 @@ class _AdherenceCard extends StatelessWidget {
                 textAlign: TextAlign.right,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: soft,
+                  fontWeight: FontWeight.w500,
+                  color: c.muted,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           SizedBox(
-            height: 64,
+            height: 72,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -194,7 +188,7 @@ class _AdherenceCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Row(
             children: [
               for (final d in week) ...[
@@ -205,8 +199,10 @@ class _AdherenceCard extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: d == week.last ? c.onAccent : soft,
+                      fontWeight: d == week.last
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                      color: d == week.last ? c.ink : c.muted,
                     ),
                   ),
                 ),
@@ -218,6 +214,7 @@ class _AdherenceCard extends StatelessWidget {
     );
   }
 
+  /// Günün oranı: gri ray üstünde alttan dolan vurgu çubuğu.
   Widget _bar(DateTime d, AppColors c) {
     final items = byDay[d] ?? const <DoseView>[];
     final ratio = items.isEmpty
@@ -226,13 +223,21 @@ class _AdherenceCard extends StatelessWidget {
               items.length;
     return LayoutBuilder(
       builder: (_, box) => Container(
-        height: items.isEmpty
-            ? 6
-            : (box.maxHeight * ratio).clamp(6, box.maxHeight),
+        height: box.maxHeight,
+        alignment: Alignment.bottomCenter,
         decoration: BoxDecoration(
-          color: c.onAccent.withValues(alpha: items.isEmpty ? 0.25 : 1),
+          color: c.chip,
           borderRadius: BorderRadius.circular(6),
         ),
+        child: ratio == 0
+            ? null
+            : Container(
+                height: (box.maxHeight * ratio).clamp(6, box.maxHeight),
+                decoration: BoxDecoration(
+                  color: c.accent,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
       ),
     );
   }

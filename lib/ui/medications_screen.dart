@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,31 +30,13 @@ class _MedicationsState extends ConsumerState<MedicationsScreen> {
     await trySyncNotifications(db);
   }
 
-  Future<bool?> _confirmDelete(String name) {
-    final c = context.c;
-    final error = Theme.of(context).colorScheme.error;
-    return showDialog<bool>(
-      context: context,
-      builder: (dc) => AlertDialog(
-        title: Text('$name silinsin mi?'),
-        content: Text(
-          'İlaç, planı ve geçmiş kayıtları kalıcı olarak silinir.',
-          style: TextStyle(color: c.muted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dc, false),
-            child: const Text('Vazgeç'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: error),
-            onPressed: () => Navigator.pop(dc, true),
-            child: const Text('Sil'),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<bool?> _confirmDelete(String name) => confirmDialog(
+    context,
+    title: '$name silinsin mi?',
+    message: 'İlaç, planı ve geçmiş kayıtları kalıcı olarak silinir.',
+    confirm: 'Sil',
+    destructive: true,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -63,11 +46,6 @@ class _MedicationsState extends ConsumerState<MedicationsScreen> {
         .toList();
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/med'),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('İlaç ekle'),
-      ),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -78,21 +56,26 @@ class _MedicationsState extends ConsumerState<MedicationsScreen> {
                 _ => null,
               },
               title: 'İlaçlarım',
+              trailing: AddButton(onPressed: () => context.push('/med')),
             ),
             Expanded(
               child: data.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Loading(),
                 error: (e, _) => LoadError(error: e),
                 data: (d) => visible!.isEmpty
-                    ? const EmptyState(
+                    ? EmptyState(
                         icon: Icons.medication_outlined,
                         title: 'Henüz ilaç eklenmedi.',
                         message:
-                            'Sağ alttaki butonla ilk ilacını ekle; saatini ve '
-                            'yemekle ilişkisini birlikte ayarlayalım.',
+                            'İlk ilacını ekle; saatini ve yemekle ilişkisini '
+                            'birlikte ayarlayalım.',
+                        action: FilledButton(
+                          onPressed: () => context.push('/med'),
+                          child: const Text('İlaç ekle'),
+                        ),
                       )
                     : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
+                        padding: listPadding(context),
                         itemCount: visible.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
                         itemBuilder: (context, i) {
@@ -104,7 +87,7 @@ class _MedicationsState extends ConsumerState<MedicationsScreen> {
                             background: Container(
                               decoration: BoxDecoration(
                                 color: scheme.error,
-                                borderRadius: BorderRadius.circular(20),
+                                borderRadius: BorderRadius.circular(18),
                               ),
                               alignment: Alignment.centerRight,
                               padding: const EdgeInsets.only(right: 24),
@@ -182,14 +165,14 @@ class _MedTile extends StatelessWidget {
                           text: ' ${m.strength}',
                           style: TextStyle(
                             color: c.muted,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                     ],
                   ),
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -210,7 +193,7 @@ class _MedTile extends StatelessWidget {
                           foodLabels[food]!,
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w500,
                             color: c.muted,
                           ),
                         ),
@@ -220,7 +203,13 @@ class _MedTile extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.chevron_right_rounded, color: c.muted),
+          Icon(
+            isApple(context)
+                ? CupertinoIcons.chevron_forward
+                : Icons.chevron_right_rounded,
+            size: isApple(context) ? 18 : 24,
+            color: c.muted,
+          ),
         ],
       ),
     );

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../core/labels.dart';
 import '../core/notifications/notification_planner.dart';
 import '../core/notifications/notification_service.dart';
 import '../core/settings_store.dart';
 import '../features/schedule/domain/schedule_models.dart';
+import 'form_rows.dart';
 import 'providers.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -73,178 +73,171 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     await trySyncNotifications(db);
   }
 
-  Future<void> _pick(int current, void Function(int) set) async {
-    final m = await pickMinutes(context, current);
-    if (m != null) set(m);
-  }
-
   @override
   Widget build(BuildContext context) {
     final m = _meals;
     final p = _prefs;
-    if (m == null || p == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    final c = context.c;
-    Widget meal(String title, int value, MealTimes Function(int) copy) =>
-        PanelRow(
-          title: title,
-          trailing: Tag(fmtMinutes(value)),
-          onTap: () => _pick(value, (v) => _saveMeals(copy(v))),
-        );
-
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: ListView(
-          padding: const EdgeInsets.only(bottom: 32),
+        child: Column(
           children: [
+            // Başlık diğer sekmelerdeki gibi sabit; yalnızca içerik kayar.
             const PageHeader(title: 'Ayarlar'),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SectionLabel(
-                    'Görünüm',
-                    padding: EdgeInsets.fromLTRB(4, 0, 4, 10),
-                  ),
-                  Segmented<ThemeMode>(
-                    options: const {
-                      ThemeMode.system: 'Sistem',
-                      ThemeMode.light: 'Açık',
-                      ThemeMode.dark: 'Koyu',
-                    },
-                    selected: ref.watch(themeModeProvider),
-                    onChanged: (v) =>
-                        ref.read(themeModeProvider.notifier).set(v),
-                  ),
-                  const SectionLabel('Günlük rutin'),
-                  GroupPanel(
-                    children: [
-                      meal('Uyanma', m.wake, (v) => m.copyWith(wake: v)),
-                      meal(
-                        'Kahvaltı',
-                        m.breakfast,
-                        (v) => m.copyWith(breakfast: v),
-                      ),
-                      meal('Öğle yemeği', m.lunch, (v) => m.copyWith(lunch: v)),
-                      meal(
-                        'Akşam yemeği',
-                        m.dinner,
-                        (v) => m.copyWith(dinner: v),
-                      ),
-                      meal('Yatma', m.bedtime, (v) => m.copyWith(bedtime: v)),
-                    ],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-                    child: Text(
-                      '"Kahvaltıda" gibi zamanlanan ilaçlar bu saatlere göre hatırlatılır.',
-                      style: TextStyle(fontSize: 12, color: c.muted),
-                    ),
-                  ),
-                  const SectionLabel('Bildirimler'),
-                  GroupPanel(
-                    children: [
-                      _minutesTile(
-                        'Önceden haber ver',
-                        p.leadMinutes,
-                        const [0, 2, 5, 10, 15],
-                        (v) => _savePrefs(p.copyWith(lead: v)),
-                        zeroLabel: 'Kapalı',
-                      ),
-                      _minutesTile(
-                        'Alınmadıysa tekrar hatırlat',
-                        p.nagMinutes,
-                        const [0, 5, 10, 15, 30],
-                        (v) => _savePrefs(p.copyWith(nag: v)),
-                        zeroLabel: 'Kapalı',
-                      ),
-                      _minutesTile('Erteleme süresi', p.snoozeMinutes, const [
-                        5,
-                        10,
-                        15,
-                        30,
-                      ], (v) => _savePrefs(p.copyWith(snooze: v))),
-                      PanelRow(
-                        leading: Icon(
-                          Icons.notifications_active_outlined,
-                          color: c.muted,
-                        ),
-                        title: 'Bildirim iznini kontrol et',
-                        trailing: Icon(
-                          Icons.chevron_right_rounded,
-                          color: c.muted,
-                        ),
-                        onTap: () async {
-                          final ok =
-                              await NotificationService.requestPermissions();
-                          await _refreshExactAlarms();
-                          if (!mounted) return;
-                          // Alarm izni yeni açıldıysa plan tam zamanlıya geçsin.
-                          await trySyncNotifications(ref.read(dbProvider));
-                          if (!mounted) return;
-                          _snack(
-                            ok ? 'Bildirimlere izin verildi.' : 'İzin verilmedi. Sistem ayarlarından açabilirsin.',
-                          );
-                        },
-                      ),
-                      PanelRow(
-                        leading: Icon(Icons.sync_rounded, color: c.muted),
-                        title: 'Bildirimleri yeniden planla',
-                        onTap: () async {
-                          var ok = true;
-                          try {
-                            await syncNotifications(ref.read(dbProvider));
-                          } catch (e) {
-                            debugPrint('Yeniden planlama hatası: $e');
-                            ok = false;
-                          }
-                          if (!mounted) return;
-                          _snack(
-                            ok
-                                ? 'Bildirimler yeniden planlandı.'
-                                : 'Bildirimler planlanamadı. Tekrar dene.',
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  if (!_exactAlarms)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-                      child: Text(
-                        '"Alarmlar ve hatırlatıcılar" izni kapalı; hatırlatmalar '
-                        'birkaç dakika gecikebilir. Açmak için "Bildirim iznini '
-                        'kontrol et"e dokun.',
-                        style: TextStyle(fontSize: 12, color: c.warn),
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: c.note,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(
-                      'Bu uygulama bir hatırlatma aracıdır; tıbbi tavsiye vermez. '
-                      'İlaç kullanımınla ilgili kararları doktorun veya eczacınla ver. '
-                      'Verilerin yalnızca bu cihazda saklanır.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.45,
-                        color: c.onNote,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            Expanded(
+              child: m == null || p == null ? const Loading() : _content(m, p),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _content(MealTimes m, NotificationPrefs p) {
+    final c = context.c;
+    Widget meal(String title, int value, MealTimes Function(int) copy) =>
+        TimeRow(
+          title: title,
+          minutes: value,
+          onChanged: (v) => _saveMeals(copy(v)),
+        );
+
+    return ListView(
+      padding: EdgeInsets.only(
+        bottom: 32 + MediaQuery.paddingOf(context).bottom,
+      ),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SectionLabel(
+                'Görünüm',
+                padding: EdgeInsets.fromLTRB(4, 0, 4, 10),
+              ),
+              Segmented<ThemeMode>(
+                options: const {
+                  ThemeMode.system: 'Sistem',
+                  ThemeMode.light: 'Açık',
+                  ThemeMode.dark: 'Koyu',
+                },
+                selected: ref.watch(themeModeProvider),
+                onChanged: (v) => ref.read(themeModeProvider.notifier).set(v),
+              ),
+              const SectionLabel('Günlük rutin'),
+              GroupPanel(
+                children: [
+                  meal('Uyanma', m.wake, (v) => m.copyWith(wake: v)),
+                  meal(
+                    'Kahvaltı',
+                    m.breakfast,
+                    (v) => m.copyWith(breakfast: v),
+                  ),
+                  meal('Öğle yemeği', m.lunch, (v) => m.copyWith(lunch: v)),
+                  meal('Akşam yemeği', m.dinner, (v) => m.copyWith(dinner: v)),
+                  meal('Yatma', m.bedtime, (v) => m.copyWith(bedtime: v)),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                child: Text(
+                  '"Kahvaltıda" gibi zamanlanan ilaçlar bu saatlere göre hatırlatılır.',
+                  style: TextStyle(fontSize: 12, color: c.muted),
+                ),
+              ),
+              const SectionLabel('Bildirimler'),
+              GroupPanel(
+                children: [
+                  _minutesTile(
+                    'Önceden haber ver',
+                    p.leadMinutes,
+                    const [0, 2, 5, 10, 15],
+                    (v) => _savePrefs(p.copyWith(lead: v)),
+                    zeroLabel: 'Kapalı',
+                  ),
+                  _minutesTile(
+                    'Alınmadıysa tekrar hatırlat',
+                    p.nagMinutes,
+                    const [0, 5, 10, 15, 30],
+                    (v) => _savePrefs(p.copyWith(nag: v)),
+                    zeroLabel: 'Kapalı',
+                  ),
+                  _minutesTile('Erteleme süresi', p.snoozeMinutes, const [
+                    5,
+                    10,
+                    15,
+                    30,
+                  ], (v) => _savePrefs(p.copyWith(snooze: v))),
+                  PanelRow(
+                    leading: Icon(
+                      Icons.notifications_active_outlined,
+                      color: c.muted,
+                    ),
+                    title: 'Bildirim iznini kontrol et',
+                    trailing: Icon(Icons.chevron_right_rounded, color: c.muted),
+                    onTap: () async {
+                      final ok = await NotificationService.requestPermissions();
+                      await _refreshExactAlarms();
+                      if (!mounted) return;
+                      // Alarm izni yeni açıldıysa plan tam zamanlıya geçsin.
+                      await trySyncNotifications(ref.read(dbProvider));
+                      if (!mounted) return;
+                      _snack(
+                        ok ? 'Bildirimlere izin verildi.' : 'İzin verilmedi. Sistem ayarlarından açabilirsin.',
+                      );
+                    },
+                  ),
+                  PanelRow(
+                    leading: Icon(Icons.sync_rounded, color: c.muted),
+                    title: 'Bildirimleri yeniden planla',
+                    onTap: () async {
+                      var ok = true;
+                      try {
+                        await syncNotifications(ref.read(dbProvider));
+                      } catch (e) {
+                        debugPrint('Yeniden planlama hatası: $e');
+                        ok = false;
+                      }
+                      if (!mounted) return;
+                      _snack(
+                        ok
+                            ? 'Bildirimler yeniden planlandı.'
+                            : 'Bildirimler planlanamadı. Tekrar dene.',
+                      );
+                    },
+                  ),
+                ],
+              ),
+              if (!_exactAlarms)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                  child: Text(
+                    '"Alarmlar ve hatırlatıcılar" izni kapalı; hatırlatmalar '
+                    'birkaç dakika gecikebilir. Açmak için "Bildirim iznini '
+                    'kontrol et"e dokun.',
+                    style: TextStyle(fontSize: 12, color: c.warn),
+                  ),
+                ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: c.note,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: c.line),
+                ),
+                child: Text(
+                  'Bu uygulama bir hatırlatma aracıdır; tıbbi tavsiye vermez. '
+                  'İlaç kullanımınla ilgili kararları doktorun veya eczacınla ver. '
+                  'Verilerin yalnızca bu cihazda saklanır.',
+                  style: TextStyle(fontSize: 13, height: 1.45, color: c.onNote),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -254,32 +247,14 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     List<int> options,
     void Function(int) onChanged, {
     String? zeroLabel,
-  }) {
-    final c = context.c;
-    // Kayıtlı değer seçenekler dışındaysa yanlış göstermemek için listeye eklenir.
-    final values = [...options, if (!options.contains(value)) value]..sort();
-    return PanelRow(
-      title: title,
-      trailing: DropdownButton<int>(
-        value: value,
-        underline: const SizedBox.shrink(),
-        borderRadius: BorderRadius.circular(14),
-        icon: Icon(Icons.expand_more_rounded, color: c.accent),
-        style: TextStyle(
-          fontFamily: fontFamily,
-          fontSize: 15,
-          fontWeight: FontWeight.w700,
-          color: c.accent,
-        ),
-        items: [
-          for (final o in values)
-            DropdownMenuItem(
-              value: o,
-              child: Text(o == 0 ? (zeroLabel ?? '0') : '$o dk'),
-            ),
-        ],
-        onChanged: (v) => v == null ? null : onChanged(v),
-      ),
-    );
-  }
+  }) => MenuRow<int>(
+    title: title,
+    value: value,
+    // Kayıtlı değer seçenekler dışındaysa yanlış göstermemek için eklenir.
+    options: {
+      for (final o in [...options, if (!options.contains(value)) value]..sort())
+        o: o == 0 ? (zeroLabel ?? '0') : '$o dk',
+    },
+    onChanged: onChanged,
+  );
 }

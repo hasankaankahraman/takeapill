@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,7 @@ import 'core/notifications/notification_service.dart';
 import 'ui/history_screen.dart';
 import 'ui/medication_form.dart';
 import 'ui/medications_screen.dart';
+import 'ui/nav_bar.dart';
 import 'ui/providers.dart';
 import 'ui/settings_screen.dart';
 import 'ui/theme.dart';
@@ -19,44 +22,25 @@ GoRouter buildRouter({required bool onboarded}) => GoRouter(
     GoRoute(path: '/welcome', builder: (_, _) => const WelcomeScreen()),
     GoRoute(
       path: '/med',
-      builder: (_, state) => MedicationFormScreen(
-        medicationId: int.tryParse(state.uri.queryParameters['id'] ?? ''),
-      ),
+      pageBuilder: (context, state) {
+        final form = MedicationFormScreen(
+          medicationId: int.tryParse(state.uri.queryParameters['id'] ?? ''),
+        );
+        // iOS'ta form, arkadaki ekranı küçülten bir sayfa olarak alttan açılır.
+        return isApple(context)
+            ? _SheetPage(key: state.pageKey, child: form)
+            : MaterialPage(key: state.pageKey, child: form);
+      },
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, shell) => Scaffold(
+        // Liste, yarı saydam alt menünün altından akar.
+        extendBody: true,
         body: shell,
-        bottomNavigationBar: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: context.c.line)),
-          ),
-          child: NavigationBar(
-            selectedIndex: shell.currentIndex,
-            onDestinationSelected: (i) =>
-                shell.goBranch(i, initialLocation: i == shell.currentIndex),
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.schedule_rounded),
-                selectedIcon: Icon(Icons.schedule_rounded),
-                label: 'Bugün',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.medication_outlined),
-                selectedIcon: Icon(Icons.medication_rounded),
-                label: 'İlaçlar',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.bar_chart_rounded),
-                selectedIcon: Icon(Icons.bar_chart_rounded),
-                label: 'Geçmiş',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.tune_rounded),
-                selectedIcon: Icon(Icons.tune_rounded),
-                label: 'Ayarlar',
-              ),
-            ],
-          ),
+        bottomNavigationBar: AppNavBar(
+          selectedIndex: shell.currentIndex,
+          onSelected: (i) =>
+              shell.goBranch(i, initialLocation: i == shell.currentIndex),
         ),
       ),
       branches: [
@@ -88,6 +72,20 @@ GoRouter buildRouter({required bool onboarded}) => GoRouter(
     ),
   ],
 );
+
+class _SheetPage<T> extends Page<T> {
+  const _SheetPage({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Route<T> createRoute(BuildContext context) => CupertinoSheetRoute<T>(
+    settings: this,
+    // Liste en üstteyken aşağı çekmek sayfayı kapatır.
+    scrollableBuilder: (_, controller) =>
+        PrimaryScrollController(controller: controller, child: child),
+  );
+}
 
 class TakeAPillApp extends ConsumerStatefulWidget {
   const TakeAPillApp({super.key, required this.router});
@@ -137,6 +135,20 @@ class _AppState extends ConsumerState<TakeAPillApp>
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
+      // AppBar'sız sekmelerde de durum çubuğu simgeleri temaya uysun;
+      // Android'in alt gezinme şeridi saydam kalsın.
+      builder: (context, child) {
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: (dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark)
+              .copyWith(
+                statusBarColor: Colors.transparent,
+                systemNavigationBarColor: Colors.transparent,
+                systemNavigationBarContrastEnforced: false,
+              ),
+          child: child!,
+        );
+      },
     );
   }
 }

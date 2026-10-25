@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:clock/clock.dart';
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +12,7 @@ import '../core/labels.dart';
 import '../core/notifications/notification_service.dart';
 import '../features/schedule/domain/rule_codec.dart';
 import '../features/schedule/domain/schedule_models.dart';
+import 'form_rows.dart';
 import 'providers.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -44,6 +48,21 @@ const _palette = [
   0xFF64748B,
 ];
 
+/// Doz birimleri; kayıtlı birim listede yoksa düzenlerken eklenir.
+const _units = [
+  'mg',
+  'mcg',
+  'g',
+  'ml',
+  'IU',
+  '%',
+  'tablet',
+  'kapsül',
+  'damla',
+  'puf',
+  'ölçek',
+];
+
 class MedicationFormScreen extends ConsumerStatefulWidget {
   const MedicationFormScreen({super.key, this.medicationId});
 
@@ -54,9 +73,10 @@ class MedicationFormScreen extends ConsumerStatefulWidget {
 }
 
 class _FormState extends ConsumerState<MedicationFormScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
-  final _strength = TextEditingController();
+  final _amount = TextEditingController();
+  String _unit = _units.first;
+  bool _nameMissing = false;
   final _purpose = TextEditingController();
   final _notes = TextEditingController();
   String _form = 'pill';
@@ -94,7 +114,16 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
       if (r != null) {
         final (m, json) = r;
         _name.text = m.name;
-        _strength.text = m.strength;
+        // "500 mg" → miktar ve birim; sayıyla başlamıyorsa olduğu gibi kalır.
+        final dose = RegExp(r'^([\d.,]+)\s*(.*)$')
+            .firstMatch(m.strength.trim());
+        if (dose != null) {
+          _amount.text = dose[1]!;
+          if (dose[2]!.isNotEmpty) _unit = dose[2]!;
+        } else {
+          _amount.text = m.strength;
+          _unit = '';
+        }
         _purpose.text = m.purpose;
         _notes.text = m.notes;
         _form = m.form;
@@ -135,7 +164,7 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
   @override
   void dispose() {
     _name.dispose();
-    _strength.dispose();
+    _amount.dispose();
     _purpose.dispose();
     _notes.dispose();
     super.dispose();
@@ -164,7 +193,10 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
   };
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_name.text.trim().isEmpty) {
+      setState(() => _nameMissing = true);
+      return;
+    }
     if (_kind == _Kind.daily && _weekdays.isEmpty) {
       _snack('En az bir gün seç.');
       return;
@@ -182,7 +214,11 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
     final med = MedicationsCompanion(
       name: Value(_name.text.trim()),
       form: Value(_form),
-      strength: Value(_strength.text.trim()),
+      strength: Value(
+        _amount.text.trim().isEmpty
+            ? ''
+            : '${_amount.text.trim()} $_unit'.trim(),
+      ),
       purpose: Value(_purpose.text.trim()),
       notes: Value(_notes.text.trim()),
       color: Value(_color),
@@ -210,470 +246,369 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
   void _snack(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
-  Future<int?> _pickTime(int current) => pickMinutes(context, current);
-
-  Future<DateTime?> _pickDate(DateTime initial) => showDatePicker(
-    context: context,
-    initialDate: initial,
-    firstDate: DateTime(2020),
-    lastDate: DateTime(2100),
-  );
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Loading());
     }
     final c = context.c;
+    final apple = isApple(context);
+    final title = widget.medicationId == null ? 'Yeni ilaç' : 'İlacı düzenle';
+    final side = math.max(20.0, (MediaQuery.sizeOf(context).width - 640) / 2);
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          tooltip: 'Kapat',
-          icon: const Icon(Icons.close_rounded),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          widget.medicationId == null ? 'Yeni ilaç' : 'İlacı düzenle',
-        ),
+        // iOS sayfası kendi üst boşluğunu bırakır.
+        primary: !apple,
+        leadingWidth: apple ? 96 : null,
+        leading: apple
+            ? CupertinoButton(
+                padding: const EdgeInsets.only(left: 16),
+                onPressed: () => context.pop(),
+                child: Text(
+                  'Vazgeç',
+                  style: TextStyle(fontFamily: fontFamily, color: c.accent),
+                ),
+              )
+            : IconButton(
+                tooltip: 'Kapat',
+                icon: const Icon(Icons.close_rounded),
+                onPressed: () => context.pop(),
+              ),
+        title: Text(title),
         actions: [
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: const Text('Kaydet'),
-          ),
-          const SizedBox(width: 8),
+          if (apple)
+            CupertinoButton(
+              padding: const EdgeInsets.only(right: 16),
+              onPressed: _saving ? null : _save,
+              child: Text(
+                'Kaydet',
+                style: TextStyle(
+                  fontFamily: fontFamily,
+                  color: c.accent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          else ...[
+            TextButton(
+              onPressed: _saving ? null : _save,
+              child: const Text(
+                'Kaydet',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-          children: [
-            _Section(
-              children: [
-                TextFormField(
-                  controller: _name,
-                  textCapitalization: TextCapitalization.words,
-                  // Medications.name sütununun sınırı.
-                  maxLength: 120,
-                  style: _inputStyle,
-                  decoration: const InputDecoration(
-                    labelText: 'İlaç adı',
-                    counterText: '',
-                  ),
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'İlaç adı gerekli'
-                      : null,
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _strength,
-                        style: _inputStyle,
-                        decoration: const InputDecoration(
-                          labelText: 'Doz / güç',
-                          hintText: '500 mg',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _purpose,
-                        style: _inputStyle,
-                        decoration: const InputDecoration(
-                          labelText: 'Ne için kullanılıyor?',
-                          hintText: 'Tansiyon…',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                TextFormField(
-                  controller: _notes,
-                  maxLines: 3,
-                  minLines: 1,
-                  style: _inputStyle,
-                  decoration: const InputDecoration(
-                    labelText: 'Notlar',
-                    hintText: 'Doktor talimatı, uyarılar…',
-                  ),
-                ),
-                const _FieldLabel('Form'),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final e in formLabels.entries)
-                      ChoicePill(
-                        label: e.value,
-                        selected: _form == e.key,
-                        onTap: () => setState(() => _form = e.key),
-                      ),
-                  ],
-                ),
-                const _FieldLabel('Renk'),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  children: [
-                    for (final col in _palette)
-                      Semantics(
-                        button: true,
-                        selected: _color == col,
-                        label: 'Renk',
-                        child: GestureDetector(
-                          onTap: () => setState(() => _color = col),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 150),
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: Color(col),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: c.surface, width: 3),
-                              boxShadow: [
-                                if (_color == col)
-                                  BoxShadow(color: Color(col), spreadRadius: 2),
-                              ],
-                            ),
-                            child: _color == col
-                                ? const Icon(
-                                    Icons.check_rounded,
-                                    size: 16,
-                                    color: Colors.white,
-                                  )
-                                : null,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _Section(
-              title: 'Zamanlama',
-              children: [
-                Segmented<_Kind>(
-                  options: const {
-                    _Kind.daily: 'Günlük',
-                    _Kind.interval: 'Her X saat',
-                    _Kind.asNeeded: 'Gerekirse',
-                  },
-                  selected: _kind,
-                  onChanged: (k) => setState(() => _kind = k),
-                ),
-                if (_kind == _Kind.daily) ..._dailySection(),
-                if (_kind == _Kind.interval) ..._intervalSection(),
-                if (_kind == _Kind.asNeeded) _asNeededSection(),
-              ],
-            ),
-            const SizedBox(height: 16),
-            GroupPanel(
-              children: [
-                PanelRow(
-                  title: 'Başlangıç',
-                  trailing: Tag(fmtDate(_start)),
-                  onTap: () async {
-                    final d = await _pickDate(_start);
-                    if (d != null) setState(() => _start = d);
-                  },
-                ),
-                PanelRow(
-                  title: 'Bitiş (kür süresi)',
-                  trailing: _end == null
-                      ? Text(
-                          'Süresiz',
-                          style: TextStyle(
-                            color: c.muted,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        )
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Tag(fmtDate(_end!)),
-                            IconButton(
-                              tooltip: 'Bitişi kaldır',
-                              icon: const Icon(Icons.close_rounded, size: 18),
-                              onPressed: () => setState(() => _end = null),
-                            ),
-                          ],
-                        ),
-                  onTap: () async {
-                    final d = await _pickDate(_end ?? _start);
-                    if (d != null) setState(() => _end = d);
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(56),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                ),
-              ),
-              onPressed: _saving ? null : _save,
-              child: const Text('Kaydet'),
-            ),
-          ],
+      body: ListView(
+        // Tablette form ortada dar bir sütun olarak kalır.
+        padding: EdgeInsets.fromLTRB(
+          side,
+          0,
+          side,
+          32 + MediaQuery.paddingOf(context).bottom,
         ),
-      ),
-    );
-  }
-
-  static const _inputStyle = TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.w600,
-  );
-
-  List<Widget> _dailySection() => [
-    for (var i = 0; i < _slots.length; i++) _slotCard(i),
-    Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton.icon(
-        onPressed: () =>
-            setState(() => _slots.add(_SlotDraft(minutes: 20 * 60))),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Doz saati ekle'),
-      ),
-    ),
-    const _FieldLabel('Hangi günler?'),
-    Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        for (var d = 1; d <= 7; d++)
-          ChoicePill(
-            circle: true,
-            label: weekdayShort[d - 1],
-            selected: _weekdays.contains(d),
-            onTap: () => setState(() {
-              _weekdays.contains(d) ? _weekdays.remove(d) : _weekdays.add(d);
-            }),
-          ),
-      ],
-    ),
-    DropdownButtonFormField<int>(
-      initialValue: _everyNDays,
-      decoration: const InputDecoration(labelText: 'Sıklık'),
-      items: [
-        const DropdownMenuItem(value: 1, child: Text('Her gün')),
-        for (var n = 2; n <= 7; n++)
-          DropdownMenuItem(value: n, child: Text('$n günde bir')),
-      ],
-      onChanged: (v) => setState(() => _everyNDays = v ?? 1),
-    ),
-  ];
-
-  Widget _slotCard(int i) {
-    final s = _slots[i];
-    final c = context.c;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: c.accentSoft,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        spacing: 10,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         children: [
-          Row(
+          FormSection(
+            footer: _nameMissing
+                ? const FormNote('İlaç adı gerekli', error: true)
+                : null,
             children: [
-              Text(
-                '${i + 1}. doz',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: c.onAccentSoft,
+              FieldRow(
+                key: const ValueKey('name'),
+                controller: _name,
+                placeholder: 'İlaç adı',
+                textCapitalization: TextCapitalization.words,
+                // Medications.name sütununun sınırı.
+                maxLength: 120,
+                onChanged: (_) {
+                  if (_nameMissing) setState(() => _nameMissing = false);
+                },
+              ),
+              FieldRow(
+                key: const ValueKey('amount'),
+                controller: _amount,
+                label: 'Doz',
+                placeholder: '500',
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                trailing: MenuButton<String>(
+                  value: _unit,
+                  options: {
+                    for (final u in {..._units, _unit}) u: u.isEmpty ? '—' : u,
+                  },
+                  onChanged: (u) => setState(() => _unit = u),
                 ),
               ),
-              const Spacer(),
-              if (s.anchor == TimingAnchor.fixed)
-                Material(
-                  color: c.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () async {
-                      final m = await _pickTime(s.minutes);
-                      if (m != null) setState(() => s.minutes = m);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      child: Text(
-                        fmtMinutes(s.minutes),
-                        semanticsLabel: 'Saat ${fmtMinutes(s.minutes)}',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: c.accent,
-                        ),
-                      ),
-                    ),
-                  ),
+              FieldRow(
+                key: const ValueKey('purpose'),
+                controller: _purpose,
+                label: 'Ne için',
+                placeholder: 'Tansiyon, takviye…',
+              ),
+              FieldRow(
+                key: const ValueKey('notes'),
+                controller: _notes,
+                placeholder: 'Notlar: doktor talimatı, uyarılar…',
+                maxLines: 4,
+              ),
+            ],
+          ),
+          FormSection(
+            header: 'Görünüm',
+            children: [
+              MenuRow<String>(
+                title: 'Form',
+                value: _form,
+                options: {
+                  ...formLabels,
+                  if (!formLabels.containsKey(_form)) _form: _form,
+                },
+                onChanged: (v) => setState(() => _form = v),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
                 ),
-              if (_slots.length > 1)
-                IconButton(
-                  tooltip: 'Dozu sil',
-                  icon: Icon(Icons.delete_outline_rounded, color: c.muted),
-                  onPressed: () => setState(() => _slots.removeAt(i)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [for (final col in _palette) _swatch(col)],
+                ),
+              ),
+            ],
+          ),
+          const SectionLabel('Zamanlama'),
+          Segmented<_Kind>(
+            options: const {
+              _Kind.daily: 'Günlük',
+              _Kind.interval: 'Her X saat',
+              _Kind.asNeeded: 'Gerekirse',
+            },
+            selected: _kind,
+            onChanged: (k) => setState(() => _kind = k),
+          ),
+          ...switch (_kind) {
+            _Kind.daily => _dailySection(),
+            _Kind.interval => _intervalSection(),
+            _Kind.asNeeded => _asNeededSection(),
+          },
+          FormSection(
+            header: 'Süre',
+            footer: _end == null
+                ? const FormNote('Bitiş tarihi yoksa süresiz devam eder.')
+                : null,
+            children: [
+              DateRow(
+                title: 'Başlangıç',
+                date: _start,
+                onChanged: (d) => setState(() => _start = d),
+              ),
+              SwitchRow(
+                title: 'Bitiş tarihi (kür)',
+                value: _end != null,
+                onChanged: (on) => setState(
+                  () => _end = on ? _start.add(const Duration(days: 7)) : null,
+                ),
+              ),
+              if (_end case final end?)
+                DateRow(
+                  title: 'Bitiş',
+                  date: end,
+                  onChanged: (d) => setState(() => _end = d),
                 ),
             ],
           ),
-          _dropdown<TimingAnchor>(
-            label: 'Ne zaman',
-            value: s.anchor,
-            items: anchorLabels,
-            onChanged: (v) => setState(() => s.anchor = v),
-          ),
-          if (s.anchor != TimingAnchor.fixed)
-            _dropdown<int>(
-              label: 'Fark',
-              value: s.offset,
-              items: {
-                for (final o in const [-60, -30, -15, 0, 15, 30, 60, 90])
-                  o: o == 0
-                      ? 'Tam o anda'
-                      : o < 0
-                      ? '${-o} dk önce'
-                      : '$o dk sonra',
-              },
-              onChanged: (v) => setState(() => s.offset = v),
-            ),
-          _dropdown<FoodRelation>(
-            label: 'Yemekle ilişki',
-            value: s.food,
-            items: foodLabels,
-            onChanged: (v) => setState(() => s.food = v),
-          ),
         ],
       ),
     );
   }
 
-  Widget _dropdown<T>({
-    required String label,
-    required T value,
-    required Map<T, String> items,
-    required ValueChanged<T> onChanged,
-  }) => DropdownButtonFormField<T>(
-    initialValue: value,
-    borderRadius: BorderRadius.circular(14),
-    decoration: InputDecoration(labelText: label, fillColor: context.c.surface),
-    items: [
-      for (final e in items.entries)
-        DropdownMenuItem(value: e.key, child: Text(e.value)),
-    ],
-    onChanged: (v) => v == null ? null : onChanged(v),
-  );
-
-  List<Widget> _intervalSection() => [
-    DropdownButtonFormField<int>(
-      initialValue: _everyHours,
-      decoration: const InputDecoration(labelText: 'Kaç saatte bir'),
-      items: [
-        for (final h in const [2, 3, 4, 6, 8, 12])
-          DropdownMenuItem(value: h, child: Text('$h saatte bir')),
-      ],
-      onChanged: (v) => setState(() => _everyHours = v ?? 8),
-    ),
-    Material(
-      color: context.c.chip,
-      borderRadius: BorderRadius.circular(14),
-      child: PanelRow(
-        title: 'İlk doz saati',
-        trailing: Text(
-          fmtMinutes(_firstMinutes),
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-            color: context.c.accent,
-          ),
+  Widget _swatch(int col) => Semantics(
+    button: true,
+    selected: _color == col,
+    label: 'Renk',
+    child: GestureDetector(
+      onTap: () => setState(() => _color = col),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: Color(col),
+          shape: BoxShape.circle,
+          border: Border.all(color: context.c.surface, width: 2.5),
+          boxShadow: [
+            if (_color == col) BoxShadow(color: Color(col), spreadRadius: 2),
+          ],
         ),
-        onTap: () async {
-          final m = await _pickTime(_firstMinutes);
-          if (m != null) setState(() => _firstMinutes = m);
-        },
+        child: _color == col
+            ? const Icon(Icons.check_rounded, size: 15, color: Colors.white)
+            : null,
       ),
     ),
-    DropdownButtonFormField<FoodRelation>(
-      initialValue: _intervalFood,
-      decoration: const InputDecoration(labelText: 'Yemekle ilişki'),
-      items: [
-        for (final e in foodLabels.entries)
-          DropdownMenuItem(value: e.key, child: Text(e.value)),
+  );
+
+  static const _offsets = [-60, -30, -15, 0, 15, 30, 60, 90];
+
+  List<Widget> _dailySection() => [
+    for (var i = 0; i < _slots.length; i++) _slotSection(i),
+    const SizedBox(height: 12),
+    GroupPanel(
+      children: [
+        PanelRow(
+          title: 'Doz saati ekle',
+          leading: Icon(
+            isApple(context)
+                ? CupertinoIcons.add_circled_solid
+                : Icons.add_circle_rounded,
+            color: context.c.accent,
+          ),
+          onTap: () => setState(() => _slots.add(_SlotDraft(minutes: 20 * 60))),
+        ),
       ],
-      onChanged: (v) => setState(() => _intervalFood = v ?? _intervalFood),
+    ),
+    FormSection(
+      header: 'Hangi günler?',
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              for (var d = 1; d <= 7; d++)
+                ChoicePill(
+                  circle: true,
+                  label: weekdayShort[d - 1],
+                  selected: _weekdays.contains(d),
+                  onTap: () => setState(() {
+                    _weekdays.contains(d)
+                        ? _weekdays.remove(d)
+                        : _weekdays.add(d);
+                  }),
+                ),
+            ],
+          ),
+        ),
+        MenuRow<int>(
+          title: 'Sıklık',
+          value: _everyNDays,
+          options: {
+            1: 'Her gün',
+            for (var n = 2; n <= 7; n++) n: '$n günde bir',
+          },
+          onChanged: (v) => setState(() => _everyNDays = v),
+        ),
+      ],
     ),
   ];
 
-  Widget _asNeededSection() => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    spacing: 12,
-    children: [
-      Text(
-        'Bu ilaç için otomatik hatırlatma yapılmaz. '
-        'Günlük üst sınırı not olarak belirleyebilirsin.',
-        style: TextStyle(color: context.c.muted, height: 1.4),
-      ),
-      DropdownButtonFormField<int?>(
-        initialValue: _maxPerDay,
-        decoration: const InputDecoration(labelText: 'Günlük en fazla'),
-        items: [
-          const DropdownMenuItem(value: null, child: Text('Belirtilmedi')),
-          for (var n = 1; n <= 8; n++)
-            DropdownMenuItem(value: n, child: Text('$n doz')),
-        ],
-        onChanged: (v) => setState(() => _maxPerDay = v),
-      ),
-    ],
-  );
-}
-
-class _Section extends StatelessWidget {
-  const _Section({this.title, required this.children});
-
-  final String? title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => Panel(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 12,
+  Widget _slotSection(int i) {
+    final s = _slots[i];
+    return FormSection(
+      header: '${i + 1}. doz',
+      action: _slots.length > 1
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(
+                    fontFamily: fontFamily,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                onPressed: () => setState(() => _slots.removeAt(i)),
+                child: const Text('Dozu sil'),
+              ),
+            )
+          : null,
       children: [
-        if (title != null)
-          Text(
-            title!,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        MenuRow<TimingAnchor>(
+          title: 'Ne zaman',
+          value: s.anchor,
+          options: anchorLabels,
+          onChanged: (v) => setState(() => s.anchor = v),
+        ),
+        if (s.anchor == TimingAnchor.fixed)
+          TimeRow(
+            title: 'Saat',
+            minutes: s.minutes,
+            onChanged: (m) => setState(() => s.minutes = m),
+          )
+        else
+          MenuRow<int>(
+            title: 'Fark',
+            value: s.offset,
+            options: {
+              for (final o in {..._offsets, s.offset})
+                o: o == 0
+                    ? 'Tam o anda'
+                    : o < 0
+                    ? '${-o} dk önce'
+                    : '$o dk sonra',
+            },
+            onChanged: (v) => setState(() => s.offset = v),
           ),
-        ...children,
+        MenuRow<FoodRelation>(
+          title: 'Yemekle ilişki',
+          value: s.food,
+          options: foodLabels,
+          onChanged: (v) => setState(() => s.food = v),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _intervalSection() => [
+    FormSection(
+      children: [
+        MenuRow<int>(
+          title: 'Sıklık',
+          value: _everyHours,
+          options: {
+            for (final h in {2, 3, 4, 6, 8, 12, _everyHours})
+              h: '$h saatte bir',
+          },
+          onChanged: (v) => setState(() => _everyHours = v),
+        ),
+        TimeRow(
+          title: 'İlk doz',
+          minutes: _firstMinutes,
+          onChanged: (m) => setState(() => _firstMinutes = m),
+        ),
+        MenuRow<FoodRelation>(
+          title: 'Yemekle ilişki',
+          value: _intervalFood,
+          options: foodLabels,
+          onChanged: (v) => setState(() => _intervalFood = v),
+        ),
       ],
     ),
-  );
-}
+  ];
 
-class _FieldLabel extends StatelessWidget {
-  const _FieldLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 4),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        color: context.c.muted,
+  List<Widget> _asNeededSection() => [
+    FormSection(
+      footer: const FormNote(
+        'Bu ilaç için otomatik hatırlatma yapılmaz. Günlük üst sınırı '
+        'not olarak belirleyebilirsin.',
       ),
+      children: [
+        MenuRow<int?>(
+          title: 'Günlük en fazla',
+          value: _maxPerDay,
+          options: {
+            null: 'Belirtilmedi',
+            for (var n = 1; n <= 8; n++) n: '$n doz',
+          },
+          onChanged: (v) => setState(() => _maxPerDay = v),
+        ),
+      ],
     ),
-  );
+  ];
 }

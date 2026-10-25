@@ -11,6 +11,7 @@ import 'package:takeapill/core/notifications/notification_service.dart';
 import 'package:takeapill/core/settings_store.dart';
 import 'package:takeapill/features/schedule/domain/rule_codec.dart';
 import 'package:takeapill/features/schedule/domain/schedule_models.dart';
+import 'package:takeapill/ui/nav_bar.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,11 @@ void main() {
       await t.pump(const Duration(milliseconds: 500));
     }
   }
+
+  /// Alt menüdeki sekme; iOS'taki cam menü etiketi iki katmanda çizer.
+  Finder tab(String label) => find
+      .descendant(of: find.byType(AppNavBar), matching: find.text(label))
+      .first;
 
   Future<void> scrollTo(WidgetTester t, Finder f) async {
     await t.scrollUntilVisible(
@@ -59,7 +65,7 @@ void main() {
     await shot(t, '11_today_empty');
 
     // --- Form ile ilaç ekle ---
-    await t.tap(find.text('İlaçlar'));
+    await t.tap(tab('İlaçlar'));
     await settle(t);
     await t.tap(find.text('İlaç ekle'));
     await settle(t);
@@ -69,25 +75,17 @@ void main() {
     await settle(t);
     expect(find.text('İlaç adı gerekli'), findsOneWidget);
 
-    await t.enterText(
-      find.widgetWithText(TextFormField, 'İlaç adı'),
-      'Metformin',
-    );
-    await t.enterText(
-      find.widgetWithText(TextFormField, 'Doz / güç'),
-      '500 mg',
-    );
-    await t.enterText(
-      find.widgetWithText(TextFormField, 'Ne için kullanılıyor?'),
-      'Şeker',
-    );
+    await t.enterText(find.byKey(const ValueKey('name')), 'Metformin');
+    // Birim menüsü varsayılan olarak "mg".
+    await t.enterText(find.byKey(const ValueKey('amount')), '500');
+    await t.enterText(find.byKey(const ValueKey('purpose')), 'Şeker');
     await t.testTextInput.receiveAction(TextInputAction.done);
     await settle(t);
 
     await scrollTo(t, find.text('Doz saati ekle'));
     await t.tap(find.text('Doz saati ekle'));
     await settle(t);
-    await scrollTo(t, find.text('Hangi günler?'));
+    await scrollTo(t, find.text('HANGİ GÜNLER?'));
 
     // İlk dozun yemek ilişkisini "Tok karnına" yap
     await t.ensureVisible(find.text('Fark etmez').first);
@@ -160,7 +158,7 @@ void main() {
     final payloadById = {for (final p in testPending) p.id: p.payload};
 
     // Bugün ekranında üç ilaç satırı
-    await t.tap(find.text('Bugün'));
+    await t.tap(tab('Bugün'));
     await settle(t, 8);
     expect(find.text('TestPill'), findsOneWidget);
     expect(find.text('Metformin'), findsNWidgets(2));
@@ -239,13 +237,13 @@ void main() {
     await settle(t, 6);
 
     // --- Geçmiş ---
-    await t.tap(find.text('Geçmiş'));
+    await t.tap(tab('Geçmiş'));
     await settle(t, 8);
     expect(find.text('Uyum oranı'), findsOneWidget);
     await shot(t, '17_history');
 
     // --- Ayarlar + tema ---
-    await t.tap(find.text('Ayarlar'));
+    await t.tap(tab('Ayarlar'));
     await settle(t, 6);
     await shot(t, '18_settings_system');
     Brightness current() =>

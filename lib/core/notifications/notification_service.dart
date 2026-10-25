@@ -90,7 +90,7 @@ NotificationDetails _details() => const NotificationDetails(
     importance: Importance.max,
     priority: Priority.high,
     category: AndroidNotificationCategory.reminder,
-    color: Color(0xFF4F46E5),
+    color: Color(0xFF0F766E),
     actions: [
       AndroidNotificationAction(actionTaken, 'Aldım'),
       AndroidNotificationAction(actionSnooze, 'Ertele'),

@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'app.dart';
 import 'core/db/app_database.dart';
@@ -12,6 +15,13 @@ import 'ui/providers.dart';
 Future<Widget> bootstrap({AppDatabase? db}) async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('tr');
+  // Liquid glass yalnızca iOS'ta; Android'de alt menü düz bulanık şerit.
+  final glass = defaultTargetPlatform == TargetPlatform.iOS;
+  if (glass) {
+    await LiquidGlassWidgets.initialize(enablePerformanceMonitor: false);
+  } else {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  }
 
   final database = db ?? AppDatabase();
   await NotificationService.init(database);
@@ -22,11 +32,18 @@ Future<Widget> bootstrap({AppDatabase? db}) async {
   // Plan yenilenemese de uygulama açılmalı; bir sonraki açılışta tekrar denenir.
   if (onboarded) await trySyncNotifications(database);
 
+  final app = TakeAPillApp(router: buildRouter(onboarded: onboarded));
   return ProviderScope(
     overrides: [
       dbProvider.overrideWithValue(database),
       initialThemeModeProvider.overrideWithValue(theme),
     ],
-    child: TakeAPillApp(router: buildRouter(onboarded: onboarded)),
+    child: glass
+        ? LiquidGlassWidgets.wrap(
+            // Uygulamadaki tema seçimi (Açık/Koyu) cama da yansısın.
+            brightnessResolver: Theme.maybeBrightnessOf,
+            child: app,
+          )
+        : app,
   );
 }

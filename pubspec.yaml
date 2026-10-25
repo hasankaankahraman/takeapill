@@ -26,6 +26,7 @@ dependencies:
   flutter_timezone: ^5.1.1
   intl: ^0.20.3
   clock: ^1.1.3
+  liquid_glass_widgets: ^1.14.2
 
 dev_dependencies:
   flutter_test:
@@ -63,5 +64,5 @@ flutter_launcher_icons:
   android: true
   image_path: "assets/icon/icon.png"
   remove_alpha_ios: true
-  adaptive_icon_background: "#4F46E5"
+  adaptive_icon_background: "#18181B"
   adaptive_icon_foreground: "assets/icon/icon_foreground.png"

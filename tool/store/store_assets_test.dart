@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:takeapill/app.dart';
 import 'package:takeapill/core/db/app_database.dart';
 import 'package:takeapill/core/settings_store.dart';
@@ -77,6 +78,9 @@ class _Device {
   final double titleSize;
 
   bool get tablet => screen.shortestSide > 600;
+
+  /// App Store görsellerinde iOS arayüzü (liquid glass alt menü) çizilir.
+  bool get apple => dir.startsWith('app-store');
 }
 
 enum _Camera { island, hole, dot }
@@ -135,6 +139,7 @@ class _Shot {
     this.subtitle,
     this.bg, {
     this.route,
+    this.push,
     this.brightness = Brightness.light,
     this.scroll = 0,
   });
@@ -146,51 +151,55 @@ class _Shot {
 
   /// null ise kilit ekranı bildirimi gösterilir.
   final String? route;
+
+  /// [route] açıldıktan sonra üstüne itilen sayfa (iOS'ta alttan açılan form).
+  final String? push;
   final Brightness brightness;
 
   /// Ekranın kaydırılacağı mesafe (telefonda; tablette ekran zaten uzun).
   final double scroll;
 }
 
-const _indigo = [Color(0xFF4F46E5), Color(0xFF7C3AED)];
-const _sky = [Color(0xFF0369A1), Color(0xFF4F46E5)];
-const _green = [Color(0xFF0F766E), Color(0xFF4F46E5)];
-const _night = [Color(0xFF15142B), Color(0xFF312E81)];
+// Uygulamanın paleti: grafit zemin, petrol yeşili vurgu.
+const _graphite = [Color(0xFF2B2B30), Color(0xFF0B0B0D)];
+const _teal = [Color(0xFF115E59), Color(0xFF0B0B0D)];
+const _night = [Color(0xFF0F3D3A), Color(0xFF050506)];
+const _glow = Color(0xFF3CCFB9);
 
 const _shots = [
   _Shot(
     '01-bugun',
     'İlaç saatini\nkaçırma.',
     'Günün dozları tek ekranda,\nsıradaki hep önde.',
-    _indigo,
+    _graphite,
     route: '/',
   ),
   _Shot(
     '02-bildirim',
     'Tam zamanında\nhatırlatır.',
     'Birkaç dakika önce, zamanında\nve gerekirse bir kez daha.',
-    _sky,
+    _teal,
   ),
   _Shot(
     '03-ilac-ekle',
     'Bir kez gir,\ngerisini unut.',
     'Saat, doz ve aç/tok durumu;\nyemek saatine göre plan.',
-    _indigo,
-    route: '/med?id=3',
-    scroll: 540,
+    _graphite,
+    route: '/meds',
+    push: '/med?id=3',
   ),
   _Shot(
     '04-ilaclar',
     'Tüm ilaçların\ntek yerde.',
     'Hap, kapsül, damla, şurup;\nher biri kendi planıyla.',
-    _green,
+    _teal,
     route: '/meds',
   ),
   _Shot(
     '05-gecmis',
     'Uyumunu\ntakip et.',
     'Aldığın, atladığın ve\nkaçırdığın her doz kayıtlı.',
-    _indigo,
+    _graphite,
     route: '/history',
   ),
   _Shot(
@@ -292,7 +301,7 @@ Future<AppDatabase> _seed() async {
     '1000 mg',
     'Takviye',
     'capsule',
-    0xFF8B5CF6,
+    0xFF64748B,
     DailyRule(
       startDate: day(-60),
       slots: const [
@@ -351,6 +360,15 @@ String get _flutterRoot {
       .replaceFirst(RegExp(r'/bin/flutter$'), '');
 }
 
+/// cupertino_icons paketinin yerel kopyası (package_config.json'dan).
+String get _cupertinoIcons {
+  final config = File('.dart_tool/package_config.json').readAsStringSync();
+  final uri = RegExp(r'"name":\s*"cupertino_icons",\s*"rootUri":\s*"([^"]+)"')
+      .firstMatch(config)!
+      .group(1)!;
+  return Uri.parse(uri).toFilePath();
+}
+
 void main() {
   setUpAll(() async {
     await initializeDateFormatting('tr');
@@ -362,6 +380,10 @@ void main() {
     await _font('MaterialIcons', [
       '$_flutterRoot/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf',
     ]);
+    await _font('packages/cupertino_icons/CupertinoIcons', [
+      '$_cupertinoIcons/assets/CupertinoIcons.ttf',
+    ]);
+    await LiquidGlassWidgets.initialize(enablePerformanceMonitor: false);
   });
 
   testWidgets('mağaza görselleri', (t) async {
@@ -383,7 +405,11 @@ void main() {
                   child: MaterialApp.router(
                     routerConfig: router,
                     debugShowCheckedModeBanner: false,
-                    theme: buildTheme(shot.brightness),
+                    theme: buildTheme(shot.brightness).copyWith(
+                      platform: device.apple
+                          ? TargetPlatform.iOS
+                          : TargetPlatform.android,
+                    ),
                     builder: (context, child) => MediaQuery(
                       data: MediaQuery.of(context).copyWith(
                         size: device.screen,
@@ -401,10 +427,18 @@ void main() {
               device: device,
               shot: shot,
               screen: screen,
-              darkStatus: route == null || shot.brightness == Brightness.dark,
+              // iOS sayfasının arkası siyah; durum çubuğu açık renk olur.
+              darkStatus:
+                  route == null ||
+                  shot.brightness == Brightness.dark ||
+                  (device.apple && shot.push != null),
             ),
             '$_out/${device.dir}/${shot.file}.png',
             scroll: device.tablet ? 0 : shot.scroll,
+            then: switch (shot.push) {
+              final push? => () => router.push(push),
+              null => null,
+            },
           );
         }
       }
@@ -432,6 +466,7 @@ Future<void> _render(
   Widget page,
   String path, {
   double scroll = 0,
+  VoidCallback? then,
 }) async {
   await t.pumpWidget(
     MaterialApp(
@@ -446,6 +481,12 @@ Future<void> _render(
   for (var i = 0; i < 10; i++) {
     await t.pump(const Duration(milliseconds: 100));
   }
+  if (then != null) {
+    then();
+    for (var i = 0; i < 10; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+  }
   await t.runAsync(() async {
     for (final e in find.byType(Image).evaluate()) {
       await precacheImage((e.widget as Image).image, e);
@@ -456,8 +497,15 @@ Future<void> _render(
     await t.pump(const Duration(milliseconds: 100));
   }
   if (scroll > 0) {
+    // Formda formun listesi; arkadaki ekranın ya da metin alanlarının değil.
+    final form = find.ancestor(
+      of: find.byKey(const ValueKey('name')),
+      matching: find.byType(Scrollable),
+    );
     t
-        .state<ScrollableState>(find.byType(Scrollable).first)
+        .state<ScrollableState>(
+          form.evaluate().isEmpty ? find.byType(Scrollable).first : form.first,
+        )
         .position
         .jumpTo(scroll);
     await t.pump(const Duration(milliseconds: 100));
@@ -510,16 +558,12 @@ class _StorePage extends StatelessWidget {
               _Blob(
                 center: Offset(w * 0.1, size.height * 0.08),
                 radius: w * 0.7,
-                color: Colors.white.withValues(alpha: 0.16),
+                color: Colors.white.withValues(alpha: 0.07),
               ),
               _Blob(
                 center: Offset(w * 1.0, size.height * 0.62),
                 radius: w * 0.9,
-                color: Color.lerp(
-                  shot.bg.last,
-                  Colors.white,
-                  0.35,
-                )!.withValues(alpha: 0.45),
+                color: _glow.withValues(alpha: 0.16),
               ),
               Positioned(
                 left: w * 0.08,
@@ -532,7 +576,7 @@ class _StorePage extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: w * device.titleSize,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         height: 1.08,
                         letterSpacing: -0.012 * w * device.titleSize,
                         color: Colors.white,
@@ -546,7 +590,7 @@ class _StorePage extends StatelessWidget {
                         fontSize: w * device.titleSize * 0.46,
                         fontWeight: FontWeight.w500,
                         height: 1.4,
-                        color: Colors.white.withValues(alpha: 0.85),
+                        color: Colors.white.withValues(alpha: 0.72),
                       ),
                     ),
                   ],
@@ -684,7 +728,7 @@ class _StatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = dark ? Colors.white : const Color(0xFF12131A);
+    final fg = dark ? Colors.white : const Color(0xFF111113);
     final island = device.camera == _Camera.island;
     final time = Text(
       '9:41',
@@ -755,7 +799,7 @@ class _LockScreen extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF1E1B4B), Color(0xFF3730A3), Color(0xFF0E7490)],
+          colors: [Color(0xFF1C1C1F), Color(0xFF0F3D3A), Color(0xFF0A0A0C)],
         ),
       ),
       child: Stack(
@@ -763,12 +807,12 @@ class _LockScreen extends StatelessWidget {
           const _Blob(
             center: Offset(60, 620),
             radius: 320,
-            color: Color(0x5538BDF8),
+            color: Color(0x443CCFB9),
           ),
           const _Blob(
             center: Offset(380, 260),
             radius: 280,
-            color: Color(0x558B5CF6),
+            color: Color(0x22FFFFFF),
           ),
           Positioned.fill(
             child: Column(
@@ -845,8 +889,8 @@ class _Notification extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const ink = Color(0xFF12131A);
-    const muted = Color(0xFF5C6070);
+    const ink = Color(0xFF111113);
+    const muted = Color(0xFF6B6B73);
     return Opacity(
       opacity: done ? 0.75 : 1,
       child: Container(
@@ -887,7 +931,7 @@ class _Notification extends StatelessWidget {
                               title,
                               style: const TextStyle(
                                 fontSize: 15,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 color: ink,
                               ),
                             ),
@@ -964,12 +1008,12 @@ class _NotifAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = primary ? Colors.white : const Color(0xFF12131A);
+    final fg = primary ? Colors.white : const Color(0xFF111113);
     return Container(
       height: 40,
       decoration: BoxDecoration(
-        color: primary ? const Color(0xFF4F46E5) : const Color(0xFFEDEEF3),
-        borderRadius: BorderRadius.circular(14),
+        color: primary ? const Color(0xFF18181B) : const Color(0xFFF0F0F2),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -980,7 +1024,7 @@ class _NotifAction extends StatelessWidget {
             text,
             style: TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: fg,
             ),
           ),
@@ -1005,7 +1049,7 @@ class _FeatureGraphic extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: _indigo,
+            colors: _graphite,
           ),
         ),
         child: Stack(
@@ -1013,7 +1057,7 @@ class _FeatureGraphic extends StatelessWidget {
             _Blob(
               center: const Offset(400, 120),
               radius: 220,
-              color: Colors.white.withValues(alpha: 0.18),
+              color: _glow.withValues(alpha: 0.18),
             ),
             Positioned(
               left: 36,
@@ -1049,7 +1093,7 @@ class _FeatureGraphic extends StatelessWidget {
                     'Take a Pill',
                     style: TextStyle(
                       fontSize: 38,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: -1,
                       height: 1.05,
                       color: Colors.white,
@@ -1060,8 +1104,8 @@ class _FeatureGraphic extends StatelessWidget {
                     'İlaçlarını unutma.',
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.85),
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.72),
                     ),
                   ),
                 ],

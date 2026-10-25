@@ -453,8 +453,8 @@ class _ReminderScene extends StatelessWidget {
           child: Opacity(
             opacity: front,
             child: _NotifCard(
-              title: 'İlaç zamanı: Metformin',
-              body: '500 mg · Tok karnına',
+              title: 'İlaç zamanı: D vitamini',
+              body: '1000 IU · Kahvaltıyla',
               time: 'şimdi',
               tint: tint,
               actions: k.at(0.5, 0.85),
@@ -690,7 +690,7 @@ class _ProgressScene extends StatelessWidget {
     final done = ticks.where((t) => t >= 0.5).length;
     final progress = (k.at(0.45, 0.7) + k.at(0.62, 0.87)) / 3;
     final rows = [
-      ('08:00', 'Metformin', '500 mg · Tok karnına'),
+      ('08:00', 'Multivitamin', '1 tablet · Kahvaltıyla'),
       ('13:00', 'Omega 3', '1 kapsül'),
       ('21:00', 'D vitamini', '1000 IU'),
     ];
@@ -925,12 +925,7 @@ class _PrivacyScene extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
     final shield = k.at(0, 0.55, Curves.easeOutBack);
-    final chips = [
-      (Icons.phone_iphone_rounded, 'Bu cihazda kalır', 22.0, true),
-      (Icons.notifications_none_rounded, 'Zamanında haber', 226.0, false),
-    ];
     return Stack(
       alignment: Alignment.center,
       clipBehavior: Clip.none,
@@ -976,43 +971,6 @@ class _PrivacyScene extends StatelessWidget {
             ),
           ),
         ),
-        Positioned(
-          left: 194,
-          top: 74,
-          child: Transform.translate(
-            offset: Offset(0, 5 * k.wave()),
-            child: Transform.scale(
-              scale: k.at(0.45, 0.75, Curves.easeOutBack),
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: c.ok,
-                  border: Border.all(color: c.surface, width: 3),
-                ),
-                child: Icon(
-                  Icons.check_rounded,
-                  size: 22,
-                  color: _isDark(context) ? c.bg : Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ),
-        for (final (i, (icon, text, top, left)) in chips.indexed)
-          Positioned(
-            top: top,
-            left: left ? -4 : null,
-            right: left ? null : -4,
-            child: Transform.translate(
-              offset: Offset(0, 4 * k.wave(0.35 * i + 0.2)),
-              child: _Pop(
-                t: k.at(0.55 + 0.12 * i, 0.88 + 0.12 * i, Curves.easeOutBack),
-                child: _GlassChip(icon: icon, text: text, tint: tint),
-              ),
-            ),
-          ),
       ],
     );
   }

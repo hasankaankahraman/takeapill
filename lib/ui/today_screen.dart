@@ -19,7 +19,6 @@ class TodayScreen extends ConsumerWidget {
     final start = DateTime(now.year, now.month, now.day);
     final end = DateTime(now.year, now.month, now.day + 1);
     final doses = ref.watch(doseViewsProvider((start, end)));
-    final c = context.c;
 
     return Scaffold(
       body: SafeArea(
@@ -29,23 +28,11 @@ class TodayScreen extends ConsumerWidget {
             PageHeader(
               eyebrow: DateFormat('d MMMM, EEEE', 'tr').format(now),
               title: 'Bugün',
-              trailing: IconButton.filled(
-                tooltip: 'İlaç ekle',
-                style: IconButton.styleFrom(
-                  backgroundColor: c.accent,
-                  foregroundColor: c.onAccent,
-                  fixedSize: const Size(44, 44),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                icon: const Icon(Icons.add_rounded),
-                onPressed: () => context.push('/med'),
-              ),
+              trailing: AddButton(onPressed: () => context.push('/med')),
             ),
             Expanded(
               child: doses.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Loading(),
                 error: (e, _) => LoadError(error: e),
                 data: (list) => list.isEmpty
                     ? EmptyState(
@@ -91,7 +78,7 @@ class _DoseList extends StatelessWidget {
       groups.putIfAbsent(_dayPart(v.dose.scheduledAt), () => []).add(v);
     }
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      padding: listPadding(context),
       children: [
         _Summary(list: list, next: next, now: now),
         for (final e in groups.entries) ...[
@@ -142,7 +129,7 @@ class _Summary extends StatelessWidget {
               children: [
                 CircularProgressIndicator(
                   value: done / list.length,
-                  strokeWidth: 9,
+                  strokeWidth: 7,
                   strokeCap: StrokeCap.round,
                   color: c.accent,
                   backgroundColor: c.chip,
@@ -155,7 +142,9 @@ class _Summary extends StatelessWidget {
                         '$done/${list.length}',
                         style: const TextStyle(
                           fontSize: 20,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.4,
+                          fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
                       Text(
@@ -181,7 +170,8 @@ class _Summary extends StatelessWidget {
                   title,
                   style: const TextStyle(
                     fontSize: 17,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
                   ),
                 ),
                 if (body.isNotEmpty) ...[
@@ -243,7 +233,7 @@ class _DoseCard extends ConsumerWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   color: done ? c.muted : c.ink,
                   decoration: done ? TextDecoration.lineThrough : null,
                   decorationColor: c.muted,
@@ -280,9 +270,7 @@ class _DoseCard extends ConsumerWidget {
               backgroundColor: c.chip,
               foregroundColor: c.muted,
               fixedSize: const Size(44, 44),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+              shape: const CircleBorder(),
             ),
             icon: const Icon(Icons.undo_rounded, size: 20),
             onPressed: () => markDose(db, view, null),
@@ -291,12 +279,10 @@ class _DoseCard extends ConsumerWidget {
           IconButton.outlined(
             tooltip: 'Aldım',
             style: IconButton.styleFrom(
-              foregroundColor: c.accent,
-              side: BorderSide(color: c.line, width: 2),
+              foregroundColor: c.ink,
+              side: BorderSide(color: c.line, width: 1.5),
               fixedSize: const Size(44, 44),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
+              shape: const CircleBorder(),
             ),
             icon: const Icon(Icons.check_rounded, size: 22),
             onPressed: () => markDose(db, view, DoseStatus.taken),
@@ -310,6 +296,7 @@ class _DoseCard extends ConsumerWidget {
       color: overdue
           ? Color.alphaBlend(c.warnSoft.withValues(alpha: 0.5), c.surface)
           : null,
+      borderColor: overdue ? c.warn.withValues(alpha: 0.35) : null,
       child: !expanded
           ? info
           : Column(
@@ -323,8 +310,8 @@ class _DoseCard extends ConsumerWidget {
                         message: 'Atla',
                         child: TextButton(
                           style: TextButton.styleFrom(
-                            backgroundColor: c.chip,
                             foregroundColor: c.ink,
+                            side: BorderSide(color: c.line),
                             minimumSize: const Size.fromHeight(46),
                           ),
                           onPressed: () =>
@@ -377,12 +364,13 @@ class _UndoChip extends StatelessWidget {
         style: TextButton.styleFrom(
           backgroundColor: c.accentSoft,
           foregroundColor: c.onAccentSoft,
-          minimumSize: const Size(44, 40),
+          minimumSize: const Size(44, 36),
           padding: const EdgeInsets.symmetric(horizontal: 12),
+          shape: const StadiumBorder(),
           textStyle: const TextStyle(
             fontFamily: fontFamily,
             fontSize: 13,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
           ),
         ),
         onPressed: onTap,

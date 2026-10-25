@@ -156,6 +156,8 @@ void main() {
     expect(testPending.any((p) => p.title!.startsWith('Birazdan')), isTrue);
     expect(testPending.any((p) => p.title!.startsWith('İlaç zamanı')), isTrue);
     expect(testPending.any((p) => p.title!.startsWith('Aldın mı')), isTrue);
+    // Android teslim edilmiş bildirimin payload'ını vermez; kimlikten bulunur.
+    final payloadById = {for (final p in testPending) p.id: p.payload};
 
     // Bugün ekranında üç ilaç satırı
     await t.tap(find.text('Bugün'));
@@ -191,8 +193,13 @@ void main() {
     await shot(t, '15_after_delivery');
 
     // --- Bildirim butonu mantığı: Aldım ---
-    final due = delivered.firstWhere((n) => n.title!.startsWith('İlaç zamanı'));
-    await handleNotificationAction(db, actionTaken, due.payload);
+    final due = delivered.firstWhere(
+      // Android başlıksız sistem bildirimleri de döndürebilir.
+      (n) => n.title?.startsWith('İlaç zamanı') ?? false,
+    );
+    final payload = due.payload ?? payloadById[due.id];
+    expect(payload, isNotNull);
+    await handleNotificationAction(db, actionTaken, payload);
     await t.pump(const Duration(seconds: 1));
     final events = await db.doseEventsBetween(
       DateTime(now.year, now.month, now.day),
@@ -204,16 +211,16 @@ void main() {
     pending = await NotificationService.pending();
     expect(
       pending.where(
-        (p) => p.title!.contains('TestPill') && p.payload == due.payload,
+        (p) => p.title!.contains('TestPill') && p.payload == payload,
       ),
       isEmpty,
       reason: 'alınan doz için bekleyen bildirim kalmamalı',
     );
 
     // Ertele mantığı: tek bir yeni bildirim planlar
-    await handleNotificationAction(db, actionSnooze, due.payload);
+    await handleNotificationAction(db, actionSnooze, payload);
     // Atla, alınmışı atlanmışa çevirir (çift kayıt yok)
-    await handleNotificationAction(db, actionSkip, due.payload);
+    await handleNotificationAction(db, actionSkip, payload);
     final events2 = await db.doseEventsBetween(
       DateTime(now.year, now.month, now.day),
       DateTime(now.year, now.month, now.day + 1),

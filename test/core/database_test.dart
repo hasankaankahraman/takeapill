@@ -37,15 +37,15 @@ void main() {
   test('doz işaretlenir ve geri alınır', () async {
     final id = await addDaily();
     final at = DateTime(2026, 11, 2, 8);
-    await db.recordDose(id, at, 'taken');
+    await db.recordDose(id, at, DoseStatus.taken);
     var views = await loadDoseViews(db, day, DateTime(2026, 11, 3));
-    expect(views.first.status, 'taken');
+    expect(views.first.status, DoseStatus.taken);
     expect(views.last.status, isNull);
 
     // Aynı doz tekrar işaretlenince çoğalmaz, güncellenir.
-    await db.recordDose(id, at, 'skipped');
+    await db.recordDose(id, at, DoseStatus.skipped);
     views = await loadDoseViews(db, day, DateTime(2026, 11, 3));
-    expect(views.first.status, 'skipped');
+    expect(views.first.status, DoseStatus.skipped);
 
     await db.clearDose(id, at);
     views = await loadDoseViews(db, day, DateTime(2026, 11, 3));
@@ -54,7 +54,7 @@ void main() {
 
   test('işaretlenen doz için bildirim planlanmaz', () async {
     final id = await addDaily();
-    await db.recordDose(id, DateTime(2026, 11, 2, 8), 'taken');
+    await db.recordDose(id, DateTime(2026, 11, 2, 8), DoseStatus.taken);
     final views = await loadDoseViews(db, day, DateTime(2026, 11, 3));
     final pending = [
       for (final v in views)
@@ -70,7 +70,7 @@ void main() {
 
   test('ilaç silinince kural ve doz kayıtları da silinir', () async {
     final id = await addDaily();
-    await db.recordDose(id, DateTime(2026, 11, 2, 8), 'taken');
+    await db.recordDose(id, DateTime(2026, 11, 2, 8), DoseStatus.taken);
     await db.deleteMedication(id);
     expect(await db.activeSchedules(), isEmpty);
     expect(await db.doseEventsBetween(day, DateTime(2026, 11, 3)), isEmpty);

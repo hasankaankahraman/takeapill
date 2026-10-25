@@ -5,6 +5,8 @@ import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../features/schedule/domain/schedule_models.dart';
+
 part 'app_database.g.dart';
 
 class Medications extends Table {
@@ -33,7 +35,7 @@ class DoseEvents extends Table {
   IntColumn get medicationId =>
       integer().references(Medications, #id, onDelete: KeyAction.cascade)();
   DateTimeColumn get scheduledAt => dateTime()();
-  // taken | skipped
+  // DoseStatus.name: taken | skipped
   TextColumn get status => text()();
   DateTimeColumn get actedAt => dateTime().withDefault(currentDateAndTime)();
 
@@ -67,12 +69,6 @@ class AppDatabase extends _$AppDatabase {
   );
 
   // --- İlaçlar ---
-  Stream<List<Medication>> watchMedications() =>
-      (select(medications)
-            ..where((m) => m.archived.equals(false))
-            ..orderBy([(m) => OrderingTerm.asc(m.name)]))
-          .watch();
-
   Future<int> addMedication(MedicationsCompanion med, String ruleJson) =>
       transaction(() async {
         final id = await into(medications).insert(med);
@@ -97,11 +93,17 @@ class AppDatabase extends _$AppDatabase {
   Future<void> deleteMedication(int id) =>
       (delete(medications)..where((m) => m.id.equals(id))).go();
 
-  /// Arşivlenmemiş tüm ilaçlar ve kuralları.
+  /// Arşivlenmemiş tüm ilaçlar ve kuralları, ada göre sıralı.
   Future<List<(Medication, String)>> activeSchedules() async {
-    final q = select(medications).join([
-      innerJoin(schedules, schedules.medicationId.equalsExp(medications.id)),
-    ])..where(medications.archived.equals(false));
+    final q =
+        select(medications).join([
+            innerJoin(
+              schedules,
+              schedules.medicationId.equalsExp(medications.id),
+            ),
+          ])
+          ..where(medications.archived.equals(false))
+          ..orderBy([OrderingTerm.asc(medications.name)]);
     final rows = await q.get();
     return [
       for (final r in rows)
@@ -130,19 +132,19 @@ class AppDatabase extends _$AppDatabase {
   Future<void> recordDose(
     int medicationId,
     DateTime scheduledAt,
-    String status,
+    DoseStatus status,
   ) {
     final row = DoseEventsCompanion.insert(
       medicationId: medicationId,
       scheduledAt: scheduledAt,
-      status: status,
+      status: status.name,
     );
     // Çakışma birincil anahtarda değil (ilaç, zaman) benzersiz çiftinde olur.
     return into(doseEvents).insert(
       row,
       onConflict: DoUpdate(
         (_) => DoseEventsCompanion(
-          status: Value(status),
+          status: Value(status.name),
           actedAt: Value(DateTime.now()),
         ),
         target: [doseEvents.medicationId, doseEvents.scheduledAt],
@@ -157,14 +159,6 @@ class AppDatabase extends _$AppDatabase {
                 e.scheduledAt.equals(scheduledAt),
           ))
           .go();
-
-  Stream<List<DoseEvent>> watchDoseEvents(DateTime from, DateTime to) =>
-      (select(doseEvents)..where(
-            (e) =>
-                e.scheduledAt.isBiggerOrEqualValue(from) &
-                e.scheduledAt.isSmallerThanValue(to),
-          ))
-          .watch();
 
   Future<List<DoseEvent>> doseEventsBetween(DateTime from, DateTime to) =>
       (select(doseEvents)..where(

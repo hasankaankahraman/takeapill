@@ -16,10 +16,17 @@ Future<Widget> bootstrap({AppDatabase? db}) async {
   final database = db ?? AppDatabase();
   await NotificationService.init(database);
   final onboarded = await database.getSetting(SettingKeys.onboarded) != null;
-  if (onboarded) await syncNotifications(database);
+  final theme = parseThemeMode(
+    await database.getSetting(SettingKeys.themeMode),
+  );
+  // Plan yenilenemese de uygulama açılmalı; bir sonraki açılışta tekrar denenir.
+  if (onboarded) await trySyncNotifications(database);
 
   return ProviderScope(
-    overrides: [dbProvider.overrideWithValue(database)],
+    overrides: [
+      dbProvider.overrideWithValue(database),
+      initialThemeModeProvider.overrideWithValue(theme),
+    ],
     child: TakeAPillApp(router: buildRouter(onboarded: onboarded)),
   );
 }

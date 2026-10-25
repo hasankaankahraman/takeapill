@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -116,10 +117,10 @@ class _AppState extends ConsumerState<TakeAPillApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      final db = ref.read(dbProvider);
+      ref.invalidate(nowProvider);
       ref.invalidate(doseViewsProvider);
-      ref.invalidate(medicationsProvider);
-      syncNotifications(db);
+      ref.invalidate(medicationPlansProvider);
+      trySyncNotifications(ref.read(dbProvider));
     }
   }
 
@@ -130,6 +131,10 @@ class _AppState extends ConsumerState<TakeAPillApp>
       routerConfig: widget.router,
       themeMode: ref.watch(themeModeProvider),
       debugShowCheckedModeBanner: false,
+      // Tarih/saat seçicileri ve sistem metinleri Türkçe, saat 24 saatlik.
+      locale: const Locale('tr'),
+      supportedLocales: const [Locale('tr')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
     );

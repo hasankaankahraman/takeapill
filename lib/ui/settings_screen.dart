@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/labels.dart';
 import '../core/notifications/notification_planner.dart';
 import '../core/notifications/notification_service.dart';
 import '../core/settings_store.dart';
 import '../features/schedule/domain/schedule_models.dart';
-import 'labels.dart';
 import 'providers.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -20,44 +20,62 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsState extends ConsumerState<SettingsScreen> {
   MealTimes? _meals;
   NotificationPrefs? _prefs;
+  bool _exactAlarms = true;
+
+  /// İzin sistem ayarlarından açılıp dönülürse uyarı kalksın.
+  late final AppLifecycleListener _lifecycle;
 
   @override
   void initState() {
     super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _refreshExactAlarms);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refreshExactAlarms() async {
+    final exact = await NotificationService.exactAlarmsAllowed();
+    if (mounted && exact != _exactAlarms) setState(() => _exactAlarms = exact);
   }
 
   Future<void> _load() async {
     final db = ref.read(dbProvider);
     final m = await db.loadMealTimes();
     final p = await db.loadNotificationPrefs();
+    final exact = await NotificationService.exactAlarmsAllowed();
     if (!mounted) return;
     setState(() {
       _meals = m;
       _prefs = p;
+      _exactAlarms = exact;
     });
   }
+
+  void _snack(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _saveMeals(MealTimes m) async {
     setState(() => _meals = m);
     final db = ref.read(dbProvider);
     await db.saveMealTimes(m);
-    await syncNotifications(db);
+    await trySyncNotifications(db);
   }
 
   Future<void> _savePrefs(NotificationPrefs p) async {
     setState(() => _prefs = p);
     final db = ref.read(dbProvider);
     await db.saveNotificationPrefs(p);
-    await syncNotifications(db);
+    await trySyncNotifications(db);
   }
 
   Future<void> _pick(int current, void Function(int) set) async {
-    final t = await showTimePicker(
-      context: context,
-      initialTime: toTimeOfDay(current),
-    );
-    if (t != null) set(t.hour * 60 + t.minute);
+    final m = await pickMinutes(context, current);
+    if (m != null) set(m);
   }
 
   @override
@@ -104,19 +122,19 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                   const SectionLabel('Günlük rutin'),
                   GroupPanel(
                     children: [
-                      meal('Uyanma', m.wake, (v) => _copy(m, wake: v)),
+                      meal('Uyanma', m.wake, (v) => m.copyWith(wake: v)),
                       meal(
                         'Kahvaltı',
                         m.breakfast,
-                        (v) => _copy(m, breakfast: v),
+                        (v) => m.copyWith(breakfast: v),
                       ),
-                      meal('Öğle yemeği', m.lunch, (v) => _copy(m, lunch: v)),
+                      meal('Öğle yemeği', m.lunch, (v) => m.copyWith(lunch: v)),
                       meal(
                         'Akşam yemeği',
                         m.dinner,
-                        (v) => _copy(m, dinner: v),
+                        (v) => m.copyWith(dinner: v),
                       ),
-                      meal('Yatma', m.bedtime, (v) => _copy(m, bedtime: v)),
+                      meal('Yatma', m.bedtime, (v) => m.copyWith(bedtime: v)),
                     ],
                   ),
                   Padding(
@@ -133,14 +151,14 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                         'Önceden haber ver',
                         p.leadMinutes,
                         const [0, 2, 5, 10, 15],
-                        (v) => _savePrefs(_copyPrefs(p, lead: v)),
+                        (v) => _savePrefs(p.copyWith(lead: v)),
                         zeroLabel: 'Kapalı',
                       ),
                       _minutesTile(
                         'Alınmadıysa tekrar hatırlat',
                         p.nagMinutes,
                         const [0, 5, 10, 15, 30],
-                        (v) => _savePrefs(_copyPrefs(p, nag: v)),
+                        (v) => _savePrefs(p.copyWith(nag: v)),
                         zeroLabel: 'Kapalı',
                       ),
                       _minutesTile('Erteleme süresi', p.snoozeMinutes, const [
@@ -148,7 +166,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                         10,
                         15,
                         30,
-                      ], (v) => _savePrefs(_copyPrefs(p, snooze: v))),
+                      ], (v) => _savePrefs(p.copyWith(snooze: v))),
                       PanelRow(
                         leading: Icon(
                           Icons.notifications_active_outlined,
@@ -162,13 +180,13 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                         onTap: () async {
                           final ok =
                               await NotificationService.requestPermissions();
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                ok ? 'Bildirimlere izin verildi.' : 'İzin verilmedi. Sistem ayarlarından açabilirsin.',
-                              ),
-                            ),
+                          await _refreshExactAlarms();
+                          if (!mounted) return;
+                          // Alarm izni yeni açıldıysa plan tam zamanlıya geçsin.
+                          await trySyncNotifications(ref.read(dbProvider));
+                          if (!mounted) return;
+                          _snack(
+                            ok ? 'Bildirimlere izin verildi.' : 'İzin verilmedi. Sistem ayarlarından açabilirsin.',
                           );
                         },
                       ),
@@ -176,17 +194,33 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                         leading: Icon(Icons.sync_rounded, color: c.muted),
                         title: 'Bildirimleri yeniden planla',
                         onTap: () async {
-                          await syncNotifications(ref.read(dbProvider));
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Bildirimler yeniden planlandı.'),
-                            ),
+                          var ok = true;
+                          try {
+                            await syncNotifications(ref.read(dbProvider));
+                          } catch (e) {
+                            debugPrint('Yeniden planlama hatası: $e');
+                            ok = false;
+                          }
+                          if (!mounted) return;
+                          _snack(
+                            ok
+                                ? 'Bildirimler yeniden planlandı.'
+                                : 'Bildirimler planlanamadı. Tekrar dene.',
                           );
                         },
                       ),
                     ],
                   ),
+                  if (!_exactAlarms)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                      child: Text(
+                        '"Alarmlar ve hatırlatıcılar" izni kapalı; hatırlatmalar '
+                        'birkaç dakika gecikebilir. Açmak için "Bildirim iznini '
+                        'kontrol et"e dokun.',
+                        style: TextStyle(fontSize: 12, color: c.warn),
+                      ),
+                    ),
                   const SizedBox(height: 20),
                   Container(
                     padding: const EdgeInsets.all(14),
@@ -248,30 +282,4 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
-
-  MealTimes _copy(
-    MealTimes m, {
-    int? wake,
-    int? breakfast,
-    int? lunch,
-    int? dinner,
-    int? bedtime,
-  }) => MealTimes(
-    wake: wake ?? m.wake,
-    breakfast: breakfast ?? m.breakfast,
-    lunch: lunch ?? m.lunch,
-    dinner: dinner ?? m.dinner,
-    bedtime: bedtime ?? m.bedtime,
-  );
-
-  NotificationPrefs _copyPrefs(
-    NotificationPrefs p, {
-    int? lead,
-    int? nag,
-    int? snooze,
-  }) => NotificationPrefs(
-    leadMinutes: lead ?? p.leadMinutes,
-    nagMinutes: nag ?? p.nagMinutes,
-    snoozeMinutes: snooze ?? p.snoozeMinutes,
-  );
 }

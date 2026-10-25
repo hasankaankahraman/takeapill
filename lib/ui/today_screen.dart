@@ -1,12 +1,11 @@
-import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../core/notifications/notification_service.dart' show foodLabel;
+import '../core/labels.dart';
 import '../features/schedule/data/schedule_repository.dart';
-import 'labels.dart';
+import '../features/schedule/domain/schedule_models.dart';
 import 'providers.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -16,7 +15,7 @@ class TodayScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final now = clock.now();
+    final now = ref.watch(nowProvider);
     final start = DateTime(now.year, now.month, now.day);
     final end = DateTime(now.year, now.month, now.day + 1);
     final doses = ref.watch(doseViewsProvider((start, end)));
@@ -47,7 +46,7 @@ class TodayScreen extends ConsumerWidget {
             Expanded(
               child: doses.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Hata: $e')),
+                error: (e, _) => LoadError(error: e),
                 data: (list) => list.isEmpty
                     ? EmptyState(
                         icon: Icons.wb_sunny_outlined,
@@ -223,10 +222,10 @@ class _DoseCard extends ConsumerWidget {
     final c = context.c;
     final at = view.dose.scheduledAt;
     final overdue = view.status == null && at.isBefore(now);
-    final taken = view.status == 'taken';
-    final skipped = view.status == 'skipped';
+    final taken = view.status == DoseStatus.taken;
+    final skipped = view.status == DoseStatus.skipped;
     final done = taken || skipped;
-    final food = foodLabel(view.dose.food.name);
+    final food = foodNote(view.dose.food);
     final med = view.medication;
     final expanded = overdue || isNext;
 
@@ -300,7 +299,7 @@ class _DoseCard extends ConsumerWidget {
               ),
             ),
             icon: const Icon(Icons.check_rounded, size: 22),
-            onPressed: () => markDose(db, view, 'taken'),
+            onPressed: () => markDose(db, view, DoseStatus.taken),
           ),
       ],
     );
@@ -328,7 +327,8 @@ class _DoseCard extends ConsumerWidget {
                             foregroundColor: c.ink,
                             minimumSize: const Size.fromHeight(46),
                           ),
-                          onPressed: () => markDose(db, view, 'skipped'),
+                          onPressed: () =>
+                              markDose(db, view, DoseStatus.skipped),
                           child: const Text('Atla'),
                         ),
                       ),
@@ -342,7 +342,7 @@ class _DoseCard extends ConsumerWidget {
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(46),
                           ),
-                          onPressed: () => markDose(db, view, 'taken'),
+                          onPressed: () => markDose(db, view, DoseStatus.taken),
                           icon: const Icon(Icons.check_rounded, size: 20),
                           label: const Text('Aldım'),
                         ),

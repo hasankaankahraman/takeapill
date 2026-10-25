@@ -5,10 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/db/app_database.dart';
+import '../core/labels.dart';
 import '../core/notifications/notification_service.dart';
 import '../features/schedule/domain/rule_codec.dart';
 import '../features/schedule/domain/schedule_models.dart';
-import 'labels.dart';
 import 'providers.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -189,25 +189,28 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
     );
     final json = encodeRule(_buildRule());
     final id = widget.medicationId;
-    if (id == null) {
-      await db.addMedication(med, json);
-    } else {
-      await db.updateMedication(id, med, json);
+    try {
+      if (id == null) {
+        await db.addMedication(med, json);
+      } else {
+        await db.updateMedication(id, med, json);
+      }
+    } catch (e) {
+      debugPrint('İlaç kaydedilemedi: $e');
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _snack('Kaydedilemedi. Lütfen tekrar dene.');
+      return;
     }
-    await syncNotifications(db);
+    // Kayıt tamam; plan yenilenemese de form kapanır, açılışta tekrar denenir.
+    await trySyncNotifications(db);
     if (mounted) context.pop();
   }
 
   void _snack(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
-  Future<int?> _pickTime(int current) async {
-    final t = await showTimePicker(
-      context: context,
-      initialTime: toTimeOfDay(current),
-    );
-    return t == null ? null : t.hour * 60 + t.minute;
-  }
+  Future<int?> _pickTime(int current) => pickMinutes(context, current);
 
   Future<DateTime?> _pickDate(DateTime initial) => showDatePicker(
     context: context,
@@ -250,8 +253,13 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
                 TextFormField(
                   controller: _name,
                   textCapitalization: TextCapitalization.words,
+                  // Medications.name sütununun sınırı.
+                  maxLength: 120,
                   style: _inputStyle,
-                  decoration: const InputDecoration(labelText: 'İlaç adı'),
+                  decoration: const InputDecoration(
+                    labelText: 'İlaç adı',
+                    counterText: '',
+                  ),
                   validator: (v) => (v == null || v.trim().isEmpty)
                       ? 'İlaç adı gerekli'
                       : null,
@@ -366,7 +374,7 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
               children: [
                 PanelRow(
                   title: 'Başlangıç',
-                  trailing: Tag(_fmtDate(_start)),
+                  trailing: Tag(fmtDate(_start)),
                   onTap: () async {
                     final d = await _pickDate(_start);
                     if (d != null) setState(() => _start = d);
@@ -385,7 +393,7 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
                       : Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Tag(_fmtDate(_end!)),
+                            Tag(fmtDate(_end!)),
                             IconButton(
                               tooltip: 'Bitişi kaldır',
                               icon: const Icon(Icons.close_rounded, size: 18),
@@ -421,9 +429,6 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
     fontSize: 16,
     fontWeight: FontWeight.w600,
   );
-
-  String _fmtDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
 
   List<Widget> _dailySection() => [
     for (var i = 0; i < _slots.length; i++) _slotCard(i),

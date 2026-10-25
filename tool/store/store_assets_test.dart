@@ -323,7 +323,7 @@ Future<AppDatabase> _seed() async {
     await db.recordDose(
       v.medication.id,
       s,
-      skipped.contains(key) ? 'skipped' : 'taken',
+      skipped.contains(key) ? DoseStatus.skipped : DoseStatus.taken,
     );
   }
   await db.setSetting(SettingKeys.onboarded, '1');

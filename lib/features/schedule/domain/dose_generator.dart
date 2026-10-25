@@ -54,10 +54,7 @@ List<PlannedDose> _daily(
     if (!rule.weekdays.contains(day.weekday)) continue;
 
     for (final slot in rule.slots) {
-      final base = slot.anchor == TimingAnchor.fixed
-          ? slot.fixedMinutes
-          : meals.minutesFor(slot.anchor) + slot.offsetMinutes;
-      final at = _at(day, base);
+      final at = _at(day, slot.minutesOn(meals));
       if (at.isBefore(from) || !at.isBefore(to)) continue;
       out.add(PlannedDose(medicationId: id, scheduledAt: at, food: slot.food));
     }

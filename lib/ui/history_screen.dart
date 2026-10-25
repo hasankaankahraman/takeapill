@@ -1,10 +1,10 @@
-import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../core/labels.dart';
 import '../features/schedule/data/schedule_repository.dart';
-import 'labels.dart';
+import '../features/schedule/domain/schedule_models.dart';
 import 'providers.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -16,7 +16,7 @@ class HistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final now = clock.now();
+    final now = ref.watch(nowProvider);
     final from = DateTime(now.year, now.month, now.day - (_days - 1));
     // Anahtar gün içinde sabit kalmalı; yoksa her çizimde yeni sorgu açılır.
     final to = DateTime(now.year, now.month, now.day + 1);
@@ -31,7 +31,7 @@ class HistoryScreen extends ConsumerWidget {
             Expanded(
               child: doses.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Hata: $e')),
+                error: (e, _) => LoadError(error: e),
                 data: (all) {
                   final list = [
                     for (final v in all)
@@ -82,9 +82,14 @@ class HistoryScreen extends ConsumerWidget {
   Widget _row(BuildContext context, DoseView v) {
     final c = context.c;
     final (icon, bg, fg, label) = switch (v.status) {
-      'taken' => (Icons.check_rounded, c.accentSoft, c.onAccentSoft, 'Alındı'),
-      'skipped' => (Icons.remove_rounded, c.chip, c.muted, 'Atlandı'),
-      _ => (Icons.priority_high_rounded, c.warnSoft, c.warn, 'Kaçırıldı'),
+      DoseStatus.taken => (
+        Icons.check_rounded,
+        c.accentSoft,
+        c.onAccentSoft,
+        'Alındı',
+      ),
+      DoseStatus.skipped => (Icons.remove_rounded, c.chip, c.muted, 'Atlandı'),
+      null => (Icons.priority_high_rounded, c.warnSoft, c.warn, 'Kaçırıldı'),
     };
     final missed = v.status == null;
     return PanelRow(
@@ -121,7 +126,7 @@ class _AdherenceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    final taken = list.where((d) => d.status == 'taken').length;
+    final taken = list.where((d) => d.status == DoseStatus.taken).length;
     final pct = (taken * 100 / list.length).round();
     final week = [
       for (var i = 6; i >= 0; i--) DateTime(now.year, now.month, now.day - i),
@@ -217,7 +222,8 @@ class _AdherenceCard extends StatelessWidget {
     final items = byDay[d] ?? const <DoseView>[];
     final ratio = items.isEmpty
         ? 0.0
-        : items.where((v) => v.status == 'taken').length / items.length;
+        : items.where((v) => v.status == DoseStatus.taken).length /
+              items.length;
     return LayoutBuilder(
       builder: (_, box) => Container(
         height: items.isEmpty

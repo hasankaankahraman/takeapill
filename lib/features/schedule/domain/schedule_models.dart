@@ -4,6 +4,9 @@ enum TimingAnchor { fixed, wake, breakfast, lunch, dinner, bedtime }
 /// Yemekle ilişki (aç/tok dahil).
 enum FoodRelation { none, before, after, withMeal, emptyStomach, fullStomach }
 
+/// Kullanıcının bir doz için yaptığı işlem. DB'de [name] olarak saklanır.
+enum DoseStatus { taken, skipped }
+
 /// Kullanıcının günlük yemek/uyku saatleri (gece yarısından itibaren dakika).
 class MealTimes {
   const MealTimes({
@@ -28,6 +31,20 @@ class MealTimes {
     TimingAnchor.bedtime => bedtime,
     TimingAnchor.fixed => throw ArgumentError('fixed has no meal time'),
   };
+
+  MealTimes copyWith({
+    int? wake,
+    int? breakfast,
+    int? lunch,
+    int? dinner,
+    int? bedtime,
+  }) => MealTimes(
+    wake: wake ?? this.wake,
+    breakfast: breakfast ?? this.breakfast,
+    lunch: lunch ?? this.lunch,
+    dinner: dinner ?? this.dinner,
+    bedtime: bedtime ?? this.bedtime,
+  );
 }
 
 /// Günlük bir doz noktası. [anchor] fixed ise [fixedMinutes] kullanılır,
@@ -48,6 +65,11 @@ class DoseSlot {
   final int fixedMinutes;
   final int offsetMinutes;
   final FoodRelation food;
+
+  /// Gece yarısından itibaren dakika; gün sınırını aşabilir (ör. 24:30).
+  int minutesOn(MealTimes meals) => anchor == TimingAnchor.fixed
+      ? fixedMinutes
+      : meals.minutesFor(anchor) + offsetMinutes;
 }
 
 sealed class ScheduleRule {

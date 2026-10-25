@@ -2,6 +2,15 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
+/// Saat seçiciyi açar; seçilen saati gece yarısından itibaren dakika döner.
+Future<int?> pickMinutes(BuildContext context, int current) async {
+  final t = await showTimePicker(
+    context: context,
+    initialTime: TimeOfDay(hour: (current ~/ 60) % 24, minute: current % 60),
+  );
+  return t == null ? null : t.hour * 60 + t.minute;
+}
+
 /// Sekme ekranlarının büyük başlığı: üstte küçük harfli bilgi, altında başlık.
 class PageHeader extends StatelessWidget {
   const PageHeader({
@@ -394,6 +403,23 @@ class EmptyState extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Veri yüklenemediğinde; ham hata metni kullanıcıya gösterilmez.
+class LoadError extends StatelessWidget {
+  const LoadError({super.key, required this.error});
+
+  final Object error;
+
+  @override
+  Widget build(BuildContext context) {
+    debugPrint('Yükleme hatası: $error');
+    return const EmptyState(
+      icon: Icons.error_outline_rounded,
+      title: 'Bir şeyler ters gitti.',
+      message: 'Veriler yüklenemedi. Uygulamayı kapatıp yeniden açmayı dene.',
     );
   }
 }

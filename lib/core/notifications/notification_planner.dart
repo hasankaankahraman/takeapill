@@ -1,6 +1,6 @@
 import '../../features/schedule/domain/schedule_models.dart';
 
-enum NotifKind { lead, due, nag }
+enum NotifKind { lead, due, nag, snooze }
 
 class NotificationPrefs {
   const NotificationPrefs({
@@ -15,7 +15,17 @@ class NotificationPrefs {
   /// Doz alınmadıysa kaç dk sonra tekrar hatırlat; 0 = kapalı.
   final int nagMinutes;
   final int snoozeMinutes;
+
+  NotificationPrefs copyWith({int? lead, int? nag, int? snooze}) =>
+      NotificationPrefs(
+        leadMinutes: lead ?? leadMinutes,
+        nagMinutes: nag ?? nagMinutes,
+        snoozeMinutes: snooze ?? snoozeMinutes,
+      );
 }
+
+/// Ertelenmiş dozlar: (ilaç, doz zamanı) → yeniden hatırlatılacağı an.
+typedef Snoozes = Map<(int, DateTime), DateTime>;
 
 class PlannedNotification {
   const PlannedNotification({
@@ -66,10 +76,12 @@ int notificationId(int medicationId, DateTime doseAt, NotifKind kind) {
 
 /// iOS en fazla 64 bekleyen yerel bildirime izin verir. En yakın [limit]
 /// bildirimi seçer; kalanlar bir sonraki yeniden planlamada eklenir.
+/// Ertelenmiş bir doz yalnızca erteleme bildirimini alır.
 List<PlannedNotification> planNotifications({
   required List<(PlannedDose, String)> doses,
   required DateTime now,
   NotificationPrefs prefs = const NotificationPrefs(),
+  Snoozes snoozes = const {},
   int limit = 60,
 }) {
   final out = <PlannedNotification>[];
@@ -90,6 +102,11 @@ List<PlannedNotification> planNotifications({
   }
 
   for (final (d, name) in doses) {
+    final snoozedUntil = snoozes[(d.medicationId, d.scheduledAt)];
+    if (snoozedUntil != null && snoozedUntil.isAfter(now)) {
+      add(d, name, NotifKind.snooze, snoozedUntil);
+      continue;
+    }
     if (prefs.leadMinutes > 0) {
       add(
         d,

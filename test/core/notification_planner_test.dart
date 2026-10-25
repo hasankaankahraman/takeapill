@@ -73,4 +73,31 @@ void main() {
     expect(decodePayload('bozuk'), isNull);
     expect(decodePayload(null), isNull);
   });
+
+  test('ertelenen doz yalnızca erteleme bildirimi alır', () {
+    final d = dose(1, DateTime(2026, 11, 2, 8));
+    final until = DateTime(2026, 11, 2, 8, 20);
+    final r = planNotifications(
+      doses: [(d, 'A')],
+      now: DateTime(2026, 11, 2, 8, 5),
+      snoozes: {(1, d.scheduledAt): until},
+    );
+    expect(r.single.kind, NotifKind.snooze);
+    expect(r.single.at, until);
+    expect(r.single.doseAt, d.scheduledAt);
+  });
+
+  test('süresi geçmiş erteleme normal plana döner', () {
+    final d = dose(1, DateTime(2026, 11, 2, 8));
+    final r = planNotifications(
+      doses: [(d, 'A')],
+      now: now,
+      snoozes: {(1, d.scheduledAt): DateTime(2026, 11, 2, 6)},
+    );
+    expect(r.map((e) => e.kind), [
+      NotifKind.lead,
+      NotifKind.due,
+      NotifKind.nag,
+    ]);
+  });
 }

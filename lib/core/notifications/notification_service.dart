@@ -1,3 +1,6 @@
+import 'dart:ui' show Color;
+
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -5,7 +8,9 @@ import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../features/schedule/data/schedule_repository.dart';
+import '../../features/schedule/domain/schedule_models.dart';
 import '../db/app_database.dart';
+import '../labels.dart';
 import '../settings_store.dart';
 import 'notification_planner.dart';
 
@@ -17,6 +22,9 @@ const actionSkip = 'skip';
 
 /// Planlama penceresi; iOS 64 sınırı nedeniyle plan her açılışta yenilenir.
 const _horizonDays = 14;
+
+/// Ertelenmiş dozları yakalamak için pencere bu kadar geriden başlar.
+const _lookback = Duration(days: 1);
 
 final _plugin = FlutterLocalNotificationsPlugin();
 
@@ -58,27 +66,16 @@ Future<void> handleNotificationAction(
 
   switch (actionId) {
     case actionTaken:
-      await db.recordDose(medId, doseAt, 'taken');
+      await db.recordDose(medId, doseAt, DoseStatus.taken);
     case actionSkip:
-      await db.recordDose(medId, doseAt, 'skipped');
+      await db.recordDose(medId, doseAt, DoseStatus.skipped);
     case actionSnooze:
       final prefs = await db.loadNotificationPrefs();
-      final meds = await db.activeSchedules();
-      final name = meds
-          .map((e) => e.$1)
-          .where((m) => m.id == medId)
-          .map((m) => m.name)
-          .firstOrNull;
-      if (name != null) {
-        await _scheduleOne(
-          id: notificationId(medId, doseAt, NotifKind.nag) ^ 0x1,
-          at: DateTime.now().add(Duration(minutes: prefs.snoozeMinutes)),
-          name: name,
-          kind: NotifKind.due,
-          payload: payload!,
-        );
-      }
-      return; // Erteleme planı bozmaz; yeniden senkron gerekmez.
+      final snoozes = await db.loadSnoozes();
+      snoozes[(medId, doseAt)] = clock.now().add(
+        Duration(minutes: prefs.snoozeMinutes),
+      );
+      await db.saveSnoozes(snoozes);
     default:
       return; // Gövdeye dokunma: uygulama açılır, işlem yok.
   }
@@ -93,6 +90,7 @@ NotificationDetails _details() => const NotificationDetails(
     importance: Importance.max,
     priority: Priority.high,
     category: AndroidNotificationCategory.reminder,
+    color: Color(0xFF4F46E5),
     actions: [
       AndroidNotificationAction(actionTaken, 'Aldım'),
       AndroidNotificationAction(actionSnooze, 'Ertele'),
@@ -109,54 +107,24 @@ NotificationDetails _details() => const NotificationDetails(
 
 String _title(NotifKind k, String name) => switch (k) {
   NotifKind.lead => 'Birazdan: $name',
-  NotifKind.due => 'İlaç zamanı: $name',
+  NotifKind.due || NotifKind.snooze => 'İlaç zamanı: $name',
   NotifKind.nag => 'Aldın mı? $name',
 };
 
-String _body(NotifKind k, DateTime doseAt, String food) {
-  final hh = doseAt.hour.toString().padLeft(2, '0');
-  final mm = doseAt.minute.toString().padLeft(2, '0');
-  final time = k == NotifKind.nag
-      ? '$hh:$mm dozu henüz işaretlenmedi'
-      : '$hh:$mm';
-  return food.isEmpty ? time : '$time · $food';
-}
-
-String foodLabel(String name) => switch (name) {
-  'before' => 'Yemekten önce',
-  'after' => 'Yemekten sonra',
-  'withMeal' => 'Yemekle birlikte',
-  'emptyStomach' => 'Aç karnına',
-  'fullStomach' => 'Tok karnına',
-  _ => '',
-};
-
-Future<void> _scheduleOne({
-  required int id,
-  required DateTime at,
-  required String name,
-  required NotifKind kind,
-  required String payload,
-  String food = '',
-}) async {
-  final decoded = decodePayload(payload);
-  await _plugin.zonedSchedule(
-    id: id,
-    scheduledDate: tz.TZDateTime.from(at, tz.local),
-    notificationDetails: _details(),
-    androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-    title: _title(kind, name),
-    body: _body(kind, decoded?.$2 ?? at, food),
-    payload: payload,
-  );
+String _body(NotifKind k, DateTime doseAt, FoodRelation food) {
+  final time = fmtTime(doseAt);
+  final main = k == NotifKind.nag ? '$time dozu henüz işaretlenmedi' : time;
+  final note = foodNote(food);
+  return note.isEmpty ? main : '$main · $note';
 }
 
 class NotificationService {
-  static Future<void> init(AppDatabase db, {void Function()? onChanged}) async {
+  static Future<void> init(AppDatabase db) async {
     await initTimezone();
     await _plugin.initialize(
       settings: InitializationSettings(
-        android: const AndroidInitializationSettings('@mipmap/ic_launcher'),
+        // Tek renkli ikon; res/raw/keep.xml R8'in silmesini engeller.
+        android: const AndroidInitializationSettings('ic_notification'),
         iOS: DarwinInitializationSettings(
           // İzin, onboarding sırasında açıklamayla istenir.
           requestAlertPermission: false,
@@ -178,10 +146,8 @@ class NotificationService {
           ],
         ),
       ),
-      onDidReceiveNotificationResponse: (r) async {
-        await handleNotificationAction(db, r.actionId, r.payload);
-        onChanged?.call();
-      },
+      onDidReceiveNotificationResponse: (r) =>
+          handleNotificationAction(db, r.actionId, r.payload),
       onDidReceiveBackgroundNotificationResponse: notificationBackgroundHandler,
     );
   }
@@ -193,7 +159,12 @@ class NotificationService {
   static Future<List<ActiveNotification>> active() =>
       _plugin.getActiveNotifications();
 
-  /// İzinleri ister; verilip verilmediğini döner.
+  /// Android 12+ "Alarmlar ve hatırlatıcılar" izni. Android 14'ten itibaren
+  /// yeni kurulumlarda varsayılan olarak kapalıdır; iOS'ta her zaman true.
+  static Future<bool> exactAlarmsAllowed() async =>
+      await _android?.canScheduleExactNotifications() ?? true;
+
+  /// İzinleri ister; bildirim izninin verilip verilmediğini döner.
   static Future<bool> requestPermissions() async {
     final ios = _plugin
         .resolvePlatformSpecificImplementation<
@@ -210,42 +181,99 @@ class NotificationService {
           ) ??
           false;
     }
-    final android = _plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
+    final android = _android;
     final ok = await android?.requestNotificationsPermission() ?? false;
-    await android?.requestExactAlarmsPermission();
+    // Bildirim izni yoksa alarm ayarları ekranına göndermenin anlamı yok.
+    if (ok && !await exactAlarmsAllowed()) {
+      await android?.requestExactAlarmsPermission();
+    }
     return ok;
   }
 }
 
+AndroidFlutterLocalNotificationsPlugin? get _android => _plugin
+    .resolvePlatformSpecificImplementation<
+      AndroidFlutterLocalNotificationsPlugin
+    >();
+
+Future<void>? _running;
+
 /// Bekleyen tüm bildirimleri silip önümüzdeki günler için yeniden planlar.
 /// İşaretlenmiş (alındı/atlandı) dozlar için bildirim üretilmez.
+///
+/// Çağrılar sırayla çalışır; yoksa üst üste iki senkronda eskisinin planı,
+/// yenisinin iptalinden sonra kurulup işaretlenmiş bir dozu hatırlatabilir.
 Future<void> syncNotifications(AppDatabase db) async {
+  for (var other = _running; other != null; other = _running) {
+    try {
+      await other;
+    } catch (_) {
+      // Öncekinin hatası çağıranına iletildi; bu senkron yine çalışır.
+    }
+  }
+  final run = _running = _sync(db);
+  try {
+    await run;
+  } finally {
+    if (identical(_running, run)) _running = null;
+  }
+}
+
+Future<void> _sync(AppDatabase db) async {
   await initTimezone();
-  final now = DateTime.now();
+  // Eklenti de geçmiş tarih kontrolünü `clock` ile yapar; aynı saat kullanılmalı.
+  final now = clock.now();
   final views = await loadDoseViews(
     db,
-    now.subtract(const Duration(hours: 1)),
+    now.subtract(_lookback),
     now.add(const Duration(days: _horizonDays)),
   );
   final pending = [
     for (final v in views)
       if (v.status == null) (v.dose, v.medication.name),
   ];
-  final prefs = await db.loadNotificationPrefs();
-  final plan = planNotifications(doses: pending, now: now, prefs: prefs);
+
+  // Zamanı geçmiş ya da doz işaretlenmişse erteleme artık gereksiz.
+  final snoozes = await db.loadSnoozes();
+  final open = {for (final (d, _) in pending) (d.medicationId, d.scheduledAt)};
+  final live = {
+    for (final e in snoozes.entries)
+      if (e.value.isAfter(now) && open.contains(e.key)) e.key: e.value,
+  };
+  if (live.length != snoozes.length) await db.saveSnoozes(live);
+
+  final plan = planNotifications(
+    doses: pending,
+    now: now,
+    prefs: await db.loadNotificationPrefs(),
+    snoozes: live,
+  );
+  // İzin yokken tam zamanlı kurulum hata verir; sistem birkaç dakika esnetsin.
+  final mode = await NotificationService.exactAlarmsAllowed()
+      ? AndroidScheduleMode.exactAllowWhileIdle
+      : AndroidScheduleMode.inexactAllowWhileIdle;
 
   await _plugin.cancelAll();
   for (final n in plan) {
-    await _scheduleOne(
+    // Planlamadan bu yana zamanı geçmiş olabilir; eklenti geçmiş tarihi reddeder.
+    if (!n.at.isAfter(clock.now())) continue;
+    await _plugin.zonedSchedule(
       id: n.id,
-      at: n.at,
-      name: n.medicationName,
-      kind: n.kind,
+      scheduledDate: tz.TZDateTime.from(n.at, tz.local),
+      notificationDetails: _details(),
+      androidScheduleMode: mode,
+      title: _title(n.kind, n.medicationName),
+      body: _body(n.kind, n.doseAt, n.food),
       payload: n.payload,
-      food: foodLabel(n.food.name),
     );
+  }
+}
+
+/// Sonucu beklenmeyen yerler için: hata uygulamayı düşürmez, kaydedilir.
+Future<void> trySyncNotifications(AppDatabase db) async {
+  try {
+    await syncNotifications(db);
+  } catch (e, s) {
+    debugPrint('Bildirimler planlanamadı: $e\n$s');
   }
 }

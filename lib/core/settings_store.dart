@@ -1,6 +1,8 @@
+import 'dart:convert';
+
+import '../features/schedule/domain/schedule_models.dart';
 import 'db/app_database.dart';
 import 'notifications/notification_planner.dart';
-import '../features/schedule/domain/schedule_models.dart';
 
 /// Ayar anahtarları (Settings tablosu).
 abstract final class SettingKeys {
@@ -12,6 +14,7 @@ abstract final class SettingKeys {
   static const leadMinutes = 'notif.lead';
   static const nagMinutes = 'notif.nag';
   static const snoozeMinutes = 'notif.snooze';
+  static const snoozes = 'notif.snoozes';
   static const onboarded = 'onboarded';
   static const themeMode = 'theme.mode';
 }
@@ -53,4 +56,28 @@ extension SettingsAccess on AppDatabase {
     await setSetting(SettingKeys.nagMinutes, '${p.nagMinutes}');
     await setSetting(SettingKeys.snoozeMinutes, '${p.snoozeMinutes}');
   }
+
+  /// Ertelemeler `[[ilaç, dozMs, ertelemeMs], ...]` olarak saklanır; böylece
+  /// planın her yenilenişinde (uygulama açılışı vb.) kaybolmazlar.
+  Future<Snoozes> loadSnoozes() async {
+    final raw = await getSetting(SettingKeys.snoozes);
+    if (raw == null) return {};
+    try {
+      return {
+        for (final e in (jsonDecode(raw) as List).cast<List>())
+          (e[0] as int, DateTime.fromMillisecondsSinceEpoch(e[1] as int)):
+              DateTime.fromMillisecondsSinceEpoch(e[2] as int),
+      };
+    } on Object {
+      return {};
+    }
+  }
+
+  Future<void> saveSnoozes(Snoozes s) => setSetting(
+    SettingKeys.snoozes,
+    jsonEncode([
+      for (final MapEntry(key: (id, dose), value: until) in s.entries)
+        [id, dose.millisecondsSinceEpoch, until.millisecondsSinceEpoch],
+    ]),
+  );
 }

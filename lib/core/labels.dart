@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
-
 import '../features/schedule/domain/schedule_models.dart';
 
+/// Gece yarısından itibaren dakikayı "SS:dd" yazar; gün taşmasını sarar.
 String fmtMinutes(int m) {
   final t = ((m % 1440) + 1440) % 1440;
   return '${(t ~/ 60).toString().padLeft(2, '0')}:${(t % 60).toString().padLeft(2, '0')}';
@@ -9,7 +8,8 @@ String fmtMinutes(int m) {
 
 String fmtTime(DateTime d) => fmtMinutes(d.hour * 60 + d.minute);
 
-TimeOfDay toTimeOfDay(int m) => TimeOfDay(hour: (m ~/ 60) % 24, minute: m % 60);
+String fmtDate(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
 
 const weekdayShort = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 
@@ -42,10 +42,5 @@ const foodLabels = {
   FoodRelation.fullStomach: 'Tok karnına',
 };
 
-String slotSummary(DoseSlot s, MealTimes meals) {
-  final when = s.anchor == TimingAnchor.fixed
-      ? fmtMinutes(s.fixedMinutes)
-      : fmtMinutes(meals.minutesFor(s.anchor) + s.offsetMinutes);
-  final food = s.food == FoodRelation.none ? '' : ' · ${foodLabels[s.food]}';
-  return '$when$food';
-}
+/// Doz satırlarında gösterilen yemek notu; "fark etmez" ise boş.
+String foodNote(FoodRelation f) => f == FoodRelation.none ? '' : foodLabels[f]!;

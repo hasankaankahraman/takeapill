@@ -50,6 +50,12 @@ final medicationPlansProvider =
       );
     });
 
+/// Bildirim izni; uygulama öne gelince yenilenir (sistem ayarlarından
+/// açılmış olabilir).
+final notificationsEnabledProvider = FutureProvider.autoDispose<bool>(
+  (_) => NotificationService.notificationsEnabled(),
+);
+
 /// Dozu alındı/atlandı olarak işaretler; null verilirse işareti geri alır.
 Future<void> markDose(AppDatabase db, DoseView v, DoseStatus? status) async {
   if (status == null) {

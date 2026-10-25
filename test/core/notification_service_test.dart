@@ -1,5 +1,6 @@
 import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:takeapill/core/db/app_database.dart';
 import 'package:takeapill/core/notifications/notification_planner.dart';
@@ -62,14 +63,26 @@ void main() {
     );
   });
 
-  test('arama modunda doz saati zil sesli arama kanalında çalar', () async {
+  test('arama modunda doz saati alarm sesli arama kanalında çalar', () async {
     await db.saveNotificationPrefs(const NotificationPrefs(callMode: true));
     await syncNotifications(db);
     Map<Object?, Object?> specifics(NotifKind k) =>
         fake.scheduled[idOf(k)]!['platformSpecifics'] as Map<Object?, Object?>;
 
-    expect(specifics(NotifKind.due)['channelId'], 'calls');
+    expect(specifics(NotifKind.due)['channelId'], 'call_alarms');
+    // Alarm akışı: telefon sessizdeyken de çalar (iOS AlarmKit gibi).
+    expect(
+      specifics(NotifKind.due)['audioAttributesUsage'],
+      AudioAttributesUsage.alarm.value,
+    );
     expect(specifics(NotifKind.due)['fullScreenIntent'], isFalse);
+    // Zil sesi kullanan eski kanal silinir.
+    expect(
+      fake.calls
+          .where((c) => c.method == 'deleteNotificationChannel')
+          .map((c) => c.arguments),
+      contains('calls'),
+    );
     expect(
       fake.scheduled[idOf(NotifKind.due)]!['payload'],
       '${payload()}|call',
@@ -79,7 +92,7 @@ void main() {
 
     // "Reddet" ertelemeyle aynıdır; erteleme bildirimi de arama olur.
     await handleNotificationAction(db, actionDecline, '${payload()}|call');
-    expect(specifics(NotifKind.snooze)['channelId'], 'calls');
+    expect(specifics(NotifKind.snooze)['channelId'], 'call_alarms');
     expect((await db.loadSnoozes()).keys, [(medId, doseAt)]);
   });
 
@@ -111,6 +124,47 @@ void main() {
     );
     expect(fake.scheduled.keys, contains(idOf(NotifKind.snooze)));
   });
+
+  test('bildirim butonu, bekleyen iOS "Reddet"ini önce uygular', () async {
+    const channel = MethodChannel('takeapill/call');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    // Uygulama kapalıyken alarmda "Reddet"e basıldı, işlem henüz işlenmedi.
+    final p = encodePayload(medId, doseAt, call: true);
+    final ms = DateTime.now().millisecondsSinceEpoch;
+    var pending = ['decline|$p|$ms'];
+    messenger.setMockMethodCallHandler(channel, (c) async {
+      if (c.method != 'takeAlarmActions') return null;
+      final out = pending;
+      pending = [];
+      return out;
+    });
+
+    // Başka bir bildirime dokunma; senkron ertelemeyi kaybetmemeli.
+    await fake.respond(payload: payload());
+    await pumpEventQueue();
+    expect((await db.loadSnoozes()).keys, [(medId, doseAt)]);
+    expect(fake.scheduled.keys, contains(idOf(NotifKind.snooze)));
+  });
+
+  test(
+    'plan dozları kapsamıyorsa uygulamayı açma hatırlatması kurulur',
+    () async {
+      // Günlük doz pencere sonrasında da sürer.
+      await syncNotifications(db);
+      final keepAlive = fake.scheduled[0];
+      expect(keepAlive?['title'], 'Hatırlatmaların sürsün');
+      // Planın son hatırlatmasından sonra çalar (aynı dilimde ISO metinler).
+      String at(Map<Object?, Object?> a) => a['scheduledDateTime'] as String;
+      final last = fake.scheduled.entries
+          .where((e) => e.key != 0)
+          .map((e) => at(e.value))
+          .reduce((a, b) => a.compareTo(b) > 0 ? a : b);
+      expect(at(keepAlive!).compareTo(last), greaterThan(0));
+    },
+  );
 
   test('alarm izni yoksa esnek moda düşer, hata vermez', () async {
     fake.exactAlarmsAllowed = false;

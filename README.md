@@ -23,11 +23,16 @@ lib/
 
 Önemli davranışlar:
 
-- iOS en fazla 64 bekleyen bildirime izin verir; plan her açılışta ve her
-  değişiklikte en yakın 60 bildirimle yeniden kurulur (`syncNotifications`).
+- iOS en fazla 64 bekleyen bildirime izin verir; plan her açılışta, her
+  değişiklikte ve her bildirim butonunda en yakın 60 bildirimle (Android'de
+  120) yeniden kurulur (`syncNotifications`). Plan sonraki dozları
+  kapsamıyorsa son bildirimden sonra "uygulamayı aç" hatırlatması kurulur.
+- Bildirim izni kapalıysa Bugün ve Ayarlar ekranlarında uyarı çıkar; dokununca
+  sistemin bildirim ayarları açılır.
 - Android 14+ cihazlarda "Alarmlar ve hatırlatıcılar" izni varsayılan olarak
   kapalıdır. İzin yoksa bildirimler esnek modda kurulur (birkaç dakika
-  gecikebilir) ve Ayarlar ekranında uyarı görünür.
+  gecikebilir) ve Ayarlar ekranında uyarı görünür. Kullanıcı izin ekranına
+  gönderilmeden önce nedeni bir pencereyle anlatılır.
 - "Ertele" kalıcıdır: Settings tablosunda saklanır, plan yenilense de korunur.
 - Hatırlatma şekli (onboarding'de seçilir, Ayarlar'dan değişir): bildirim ya
   da arama. Arama modunda doz saati ve erteleme hatırlatması "Reddet /
@@ -36,9 +41,13 @@ lib/
   - iOS 26+ (alarm izni varsa): AlarmKit alarmı (`ios/Runner/CallAlarms.swift`);
     Dynamic Island'da ve kilit ekranında çıkar, sessiz modu ve Odak'ı aşar.
     Reddet uygulamayı açmadan erteleme alarmı kurar. Butonlar UserDefaults'a
-    yazılır, Dart açılışta/öne gelince işler (`applyAlarmActions`).
-  - Android, daha eski iOS ya da izin yoksa: zil sesli bildirim (Android'de
-    telefonun zil sesi, `calls` kanalı; iOS'ta `ios/Runner/ring.caf`).
+    yazılır, Dart açılışta, öne gelince ve her bildirim butonundan önce işler
+    (`applyAlarmActions`). Alarm başlığında yemek notu da yer alır.
+  - Android: telefonun zil sesi alarm akışında çalar (`call_alarms` kanalı),
+    böylece sessiz/titreşim modunda da duyulur; 60 sn sonra susar. Tam ekran
+    arama yok (`USE_FULL_SCREEN_INTENT` Play politikası gereği kaldırıldı).
+  - Daha eski iOS ya da izin yoksa: `ios/Runner/ring.caf` sesli bildirim;
+    sessiz modda yalnızca titrer.
 
 ## Geliştirme
 

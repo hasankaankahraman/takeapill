@@ -13,6 +13,9 @@ class FakeNotifications {
   /// Android 14'te yeni kurulumun varsayılanı false'tur.
   bool exactAlarmsAllowed = true;
 
+  /// Bildirim izni (Android 13+ POST_NOTIFICATIONS).
+  bool notificationsEnabled = true;
+
   /// Gerçek kanal gibi her yanıtın bir olay döngüsü sürmesini sağlar; sırasız
   /// çalışan iki senkron böylece iç içe geçebilir.
   Duration latency = Duration.zero;
@@ -35,6 +38,8 @@ class FakeNotifications {
               scheduled[args['id'] as int] = args;
             case 'canScheduleExactNotifications':
               return exactAlarmsAllowed;
+            case 'areNotificationsEnabled':
+              return notificationsEnabled;
             case 'initialize' ||
                 'requestNotificationsPermission' ||
                 'requestExactAlarmsPermission':

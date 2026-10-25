@@ -7,6 +7,7 @@ import '../core/review.dart';
 import '../core/settings_store.dart';
 import '../features/schedule/domain/schedule_models.dart';
 import 'form_rows.dart';
+import 'permission_prompts.dart';
 import 'providers.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -22,6 +23,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
   MealTimes? _meals;
   NotificationPrefs? _prefs;
   bool _exactAlarms = true;
+  bool _notificationsOn = true;
 
   /// iOS AlarmKit izni (bkz. [NotificationService.callAlarmState]).
   String? _alarmState;
@@ -32,7 +34,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _lifecycle = AppLifecycleListener(onResume: _refreshExactAlarms);
+    _lifecycle = AppLifecycleListener(onResume: _refreshPermissions);
     _load();
   }
 
@@ -42,13 +44,20 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     super.dispose();
   }
 
-  Future<void> _refreshExactAlarms() async {
+  Future<void> _refreshPermissions() async {
     final exact = await NotificationService.exactAlarmsAllowed();
     final alarm = await NotificationService.callAlarmState();
-    if (!mounted || (exact == _exactAlarms && alarm == _alarmState)) return;
+    final on = await NotificationService.notificationsEnabled();
+    if (!mounted ||
+        (exact == _exactAlarms &&
+            alarm == _alarmState &&
+            on == _notificationsOn)) {
+      return;
+    }
     setState(() {
       _exactAlarms = exact;
       _alarmState = alarm;
+      _notificationsOn = on;
     });
     // Alarm izni sistem ayarlarından açıldıysa aramalar alarma geçsin.
     await trySyncNotifications(ref.read(dbProvider));
@@ -60,17 +69,20 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     final p = await db.loadNotificationPrefs();
     final exact = await NotificationService.exactAlarmsAllowed();
     final alarm = await NotificationService.callAlarmState();
+    final on = await NotificationService.notificationsEnabled();
     if (!mounted) return;
     setState(() {
       _meals = m;
       _prefs = p;
       _exactAlarms = exact;
       _alarmState = alarm;
+      _notificationsOn = on;
     });
   }
 
-  void _snack(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _snack(String text, {SnackBarAction? action}) =>
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(text), action: action));
 
   Future<void> _saveMeals(MealTimes m) async {
     setState(() => _meals = m);
@@ -170,7 +182,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                       // Önce izin: plan, izne göre alarm ya da bildirimle kurulur.
                       if (v) await NotificationService.requestCallPermission();
                       await _savePrefs(p.copyWith(call: v));
-                      await _refreshExactAlarms();
+                      await _refreshPermissions();
                     },
                   ),
                   _minutesTile(
@@ -202,13 +214,23 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                     trailing: Icon(Icons.chevron_right_rounded, color: c.muted),
                     onTap: () async {
                       final ok = await NotificationService.requestPermissions();
-                      await _refreshExactAlarms();
+                      if (ok && mounted) await askExactAlarms(context);
+                      await _refreshPermissions();
                       if (!mounted) return;
                       // Alarm izni yeni açıldıysa plan tam zamanlıya geçsin.
                       await trySyncNotifications(ref.read(dbProvider));
                       if (!mounted) return;
+                      // Reddedilen izin için pencere bir daha çıkmayabilir.
                       _snack(
-                        ok ? 'Bildirimlere izin verildi.' : 'İzin verilmedi. Sistem ayarlarından açabilirsin.',
+                        ok
+                            ? 'Bildirimlere izin verildi.'
+                            : 'Bildirim izni kapalı.',
+                        action: ok
+                            ? null
+                            : const SnackBarAction(
+                                label: 'Ayarları aç',
+                                onPressed: NotificationService.openSettings,
+                              ),
                       );
                     },
                   ),
@@ -233,12 +255,27 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                   ),
                 ],
               ),
+              if (!_notificationsOn)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                  child: Text(
+                    'Bildirimler kapalı; ilaç hatırlatmaları gelmez. Açmak '
+                    'için "Bildirim iznini kontrol et"e dokun.',
+                    style: TextStyle(fontSize: 12, color: c.warn),
+                  ),
+                ),
               if (p.callMode)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
                   child: Text(
-                    'İlaç saatinde telefonun arama gibi çalar. Kabul edersen '
-                    'uygulama açılır, reddedersen ertelenir.',
+                    [
+                      'İlaç saatinde telefonun arama gibi çalar. Kabul edersen '
+                          'uygulama açılır, reddedersen ertelenir.',
+                      // iOS'taki sınırlar aşağıda, alarm iznine göre yazılır.
+                      if (!isApple(context))
+                        'Telefon sessizdeyken de alarm sesiyle çalar; bir '
+                            'dakika içinde yanıtlanmazsa susar.',
+                    ].join(' '),
                     style: TextStyle(fontSize: 12, color: c.muted),
                   ),
                 ),
@@ -247,8 +284,8 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
                   child: Text(
                     'Alarm izni kapalı; arama Dynamic Island yerine bildirim '
-                    'olarak gelir. Açmak için: iPhone Ayarları › Take a Pill '
-                    '› Alarmlar.',
+                    'olarak gelir ve sessiz modda çalmaz. Açmak için: iPhone '
+                    'Ayarları › Take a Pill › Alarmlar.',
                     style: TextStyle(fontSize: 12, color: c.warn),
                   ),
                 ),
@@ -257,7 +294,8 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
                   child: Text(
                     'Dynamic Island\'da arama için iOS 26 gerekir; bu cihazda '
-                    'arama, zil sesli bildirim olarak gelir.',
+                    'arama, zil sesli bildirim olarak gelir ve sessiz modda '
+                    'çalmaz.',
                     style: TextStyle(fontSize: 12, color: c.muted),
                   ),
                 ),

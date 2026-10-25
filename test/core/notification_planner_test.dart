@@ -50,6 +50,47 @@ void main() {
     expect(r.first.at, DateTime(2026, 11, 2, 7, 55));
   });
 
+  group('uygulamayı açma hatırlatması', () {
+    final horizonEnd = now.add(const Duration(days: 14));
+
+    test('sınır dozları kesince planın sonundan sonra kurulur', () {
+      final doses = [
+        for (var i = 0; i < 40; i++)
+          (dose(1, DateTime(2026, 11, 2, 8).add(Duration(hours: i))), 'A'),
+      ];
+      final plan = planNotifications(doses: doses, now: now, limit: 10);
+      expect(
+        keepAliveAt(doses: doses, plan: plan, horizonEnd: horizonEnd),
+        plan.last.at.add(const Duration(minutes: 1)),
+      );
+    });
+
+    test('ilaç pencere sonuna kadar sürüyorsa kurulur', () {
+      final doses = [
+        (dose(1, DateTime(2026, 11, 2, 8)), 'A'),
+        (dose(1, horizonEnd.subtract(const Duration(hours: 2))), 'A'),
+      ];
+      final plan = planNotifications(doses: doses, now: now);
+      expect(
+        keepAliveAt(doses: doses, plan: plan, horizonEnd: horizonEnd),
+        plan.last.at.add(const Duration(minutes: 1)),
+      );
+    });
+
+    test('tüm dozlar kapsanmışsa ve ilaç bitiyorsa kurulmaz', () {
+      final doses = [(dose(1, DateTime(2026, 11, 3, 8)), 'A')];
+      final plan = planNotifications(doses: doses, now: now);
+      expect(
+        keepAliveAt(doses: doses, plan: plan, horizonEnd: horizonEnd),
+        isNull,
+      );
+      expect(
+        keepAliveAt(doses: const [], plan: const [], horizonEnd: horizonEnd),
+        isNull,
+      );
+    });
+  });
+
   test('kimlik kararlı, farklı doz/tür için farklı', () {
     final at = DateTime(2026, 11, 2, 8);
     expect(

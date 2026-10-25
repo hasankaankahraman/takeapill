@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../core/notifications/notification_service.dart';
 import '../core/settings_store.dart';
 import 'onboarding_art.dart';
+import 'permission_prompts.dart';
 import 'providers.dart';
 import 'theme.dart';
 
@@ -56,6 +57,8 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     final prefs = await db.loadNotificationPrefs();
     await db.saveNotificationPrefs(prefs.copyWith(call: _call));
     final ok = await NotificationService.requestPermissions();
+    // Bildirim izni yoksa alarm ayarları ekranına göndermenin anlamı yok.
+    if (ok && mounted) await askExactAlarms(context);
     if (ok && _call) await NotificationService.requestCallPermission();
     await db.setSetting(SettingKeys.onboarded, '1');
     if (mounted) context.go('/');

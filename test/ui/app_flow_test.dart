@@ -241,6 +241,51 @@ void main() {
     await finish(t, db);
   });
 
+  testWidgets('bildirim izni kapalıysa Bugün\'de ve Ayarlar\'da uyarı', (
+    t,
+  ) async {
+    fake.notificationsEnabled = false;
+    final db = await t.runAsync(() => seeded([8 * 60])) as AppDatabase;
+    await start(t, db: db);
+    expect(find.textContaining('Bildirimler kapalı'), findsOneWidget);
+    await t.tap(find.textContaining('Bildirimler kapalı'));
+    await settle(t);
+    expect(
+      fake.calls.map((c) => c.method),
+      contains('openAppNotificationSettings'),
+    );
+    await t.tap(find.text('Ayarlar'));
+    await settle(t);
+    expect(find.textContaining('Bildirimler kapalı'), findsOneWidget);
+    await finish(t, db);
+  });
+
+  testWidgets('Android alarm izni, ayarlara göndermeden önce anlatılır', (
+    t,
+  ) async {
+    fake.exactAlarmsAllowed = false;
+    final db = await start(t);
+    for (var i = 0; i < 4; i++) {
+      await t.tap(find.text('Devam'));
+      await settle(t);
+    }
+    await t.tap(find.text('Başla ve bildirimlere izin ver'));
+    await settle(t);
+    expect(find.text('Tam saatinde hatırlatma'), findsOneWidget);
+    expect(
+      fake.calls.map((c) => c.method),
+      isNot(contains('requestExactAlarmsPermission')),
+    );
+    await t.tap(find.text('Ayarları aç'));
+    await settle(t);
+    expect(
+      fake.calls.map((c) => c.method),
+      contains('requestExactAlarmsPermission'),
+    );
+    expect(find.text('Bugün için planlı ilaç yok.'), findsOneWidget);
+    await finish(t, db);
+  });
+
   testWidgets('alarm izni kapalıysa ayarlarda uyarı görünür', (t) async {
     fake.exactAlarmsAllowed = false;
     final db = await t.runAsync(() => seeded([8 * 60])) as AppDatabase;

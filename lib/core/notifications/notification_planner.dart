@@ -93,8 +93,8 @@ int notificationId(int medicationId, DateTime doseAt, NotifKind kind) {
   return h & 0x7fffffff;
 }
 
-/// iOS en fazla 64 bekleyen yerel bildirime izin verir. En yakın [limit]
-/// bildirimi seçer; kalanlar bir sonraki yeniden planlamada eklenir.
+/// En yakın [limit] bildirimi seçer (iOS en fazla 64 bekleyen yerel bildirime
+/// izin verir); kalanlar bir sonraki yeniden planlamada eklenir.
 /// Ertelenmiş bir doz yalnızca erteleme bildirimini alır.
 List<PlannedNotification> planNotifications({
   required List<(PlannedDose, String)> doses,
@@ -153,4 +153,23 @@ List<PlannedNotification> planNotifications({
     return c != 0 ? c : a.id.compareTo(b.id);
   });
   return out.length > limit ? out.sublist(0, limit) : out;
+}
+
+/// Plan yalnızca uygulama açılınca (ya da bildirim butonuna basılınca)
+/// uzar; kullanıcı günlerce açmazsa sınır ya da pencere sonunda hatırlatmalar
+/// durur. Planın kapsamadığı dozlar varsa son bildirimden bir dakika sonra
+/// uygulamayı açmayı hatırlatan bildirimin zamanı; gerek yoksa null.
+DateTime? keepAliveAt({
+  required List<(PlannedDose, String)> doses,
+  required List<PlannedNotification> plan,
+  required DateTime horizonEnd,
+}) {
+  if (plan.isEmpty) return null;
+  final last = plan.last.at;
+  // Pencerenin son gününde doz varsa ilaç pencereden sonra da sürüyordur.
+  final tail = horizonEnd.subtract(const Duration(days: 1));
+  final uncovered = doses.any(
+    (e) => e.$1.scheduledAt.isAfter(last) || e.$1.scheduledAt.isAfter(tail),
+  );
+  return uncovered ? last.add(const Duration(minutes: 1)) : null;
 }

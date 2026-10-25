@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../core/labels.dart';
+import '../core/notifications/notification_service.dart';
 import '../core/review.dart';
 import '../features/schedule/data/schedule_repository.dart';
 import '../features/schedule/domain/schedule_models.dart';
@@ -31,6 +32,8 @@ class TodayScreen extends ConsumerWidget {
               title: 'Bugün',
               trailing: AddButton(onPressed: () => context.push('/med')),
             ),
+            if (ref.watch(notificationsEnabledProvider).value == false)
+              const _NotificationsOff(),
             Expanded(
               child: doses.when(
                 loading: () => const Loading(),
@@ -50,6 +53,52 @@ class TodayScreen extends ConsumerWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// İzin kapalıyken hiçbir hatırlatma gelmez; sistem ayarlarına kısayol.
+class _NotificationsOff extends StatelessWidget {
+  const _NotificationsOff();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final radius = BorderRadius.circular(14);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+      child: Material(
+        color: c.note,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(color: c.line),
+        ),
+        child: InkWell(
+          borderRadius: radius,
+          onTap: NotificationService.openSettings,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Icon(Icons.notifications_off_outlined, color: c.warn),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Bildirimler kapalı; ilaç hatırlatmaları gelmez. '
+                    'Açmak için dokun.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color: c.onNote,
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: c.muted),
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -133,6 +133,7 @@ class _AppState extends ConsumerState<TakeAPillApp>
       ref.invalidate(nowProvider);
       ref.invalidate(doseViewsProvider);
       ref.invalidate(medicationPlansProvider);
+      ref.invalidate(notificationsEnabledProvider);
       final db = ref.read(dbProvider);
       // Arka planda iOS alarmından "Kabul et" ya da "Reddet" basılmış olabilir.
       NotificationService.applyAlarmActions(db).then((answered) {

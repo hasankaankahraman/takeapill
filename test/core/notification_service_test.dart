@@ -1,4 +1,5 @@
 import 'package:drift/native.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:takeapill/core/db/app_database.dart';
 import 'package:takeapill/core/notifications/notification_planner.dart';
@@ -59,6 +60,56 @@ void main() {
       fake.scheduled[idOf(NotifKind.due)]!['title'],
       'İlaç zamanı: Metformin',
     );
+  });
+
+  test('arama modunda doz saati zil sesli arama kanalında çalar', () async {
+    await db.saveNotificationPrefs(const NotificationPrefs(callMode: true));
+    await syncNotifications(db);
+    Map<Object?, Object?> specifics(NotifKind k) =>
+        fake.scheduled[idOf(k)]!['platformSpecifics'] as Map<Object?, Object?>;
+
+    expect(specifics(NotifKind.due)['channelId'], 'calls');
+    expect(specifics(NotifKind.due)['fullScreenIntent'], isFalse);
+    expect(
+      fake.scheduled[idOf(NotifKind.due)]!['payload'],
+      '${payload()}|call',
+    );
+    expect(specifics(NotifKind.lead)['channelId'], 'doses');
+    expect(specifics(NotifKind.nag)['channelId'], 'doses');
+
+    // "Reddet" ertelemeyle aynıdır; erteleme bildirimi de arama olur.
+    await handleNotificationAction(db, actionDecline, '${payload()}|call');
+    expect(specifics(NotifKind.snooze)['channelId'], 'calls');
+    expect((await db.loadSnoozes()).keys, [(medId, doseAt)]);
+  });
+
+  test('iOS alarmında "Reddet" erteler, "Kabul et" bildirilir', () async {
+    const channel = MethodChannel('takeapill/call');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    // Yerel taraf yoksa (Android, testler) işlem yok sayılır.
+    expect(await NotificationService.applyAlarmActions(db), isFalse);
+
+    final at = DateTime.fromMillisecondsSinceEpoch(
+      DateTime.now().millisecondsSinceEpoch,
+    );
+    final p = encodePayload(medId, doseAt, call: true);
+    final ms = at.millisecondsSinceEpoch;
+    messenger.setMockMethodCallHandler(
+      channel,
+      (c) async => c.method == 'takeAlarmActions'
+          ? ['decline|$p|$ms', 'answer|$p|$ms', 'bozuk']
+          : null,
+    );
+    expect(await NotificationService.applyAlarmActions(db), isTrue);
+    // Erteleme, butona basıldığı andan sayılır (uygulama sonra açılsa da).
+    expect(
+      (await db.loadSnoozes())[(medId, doseAt)],
+      at.add(const Duration(minutes: 10)),
+    );
+    expect(fake.scheduled.keys, contains(idOf(NotifKind.snooze)));
   });
 
   test('alarm izni yoksa esnek moda düşer, hata vermez', () async {

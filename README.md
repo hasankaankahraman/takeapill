@@ -29,6 +29,16 @@ lib/
   kapalıdır. İzin yoksa bildirimler esnek modda kurulur (birkaç dakika
   gecikebilir) ve Ayarlar ekranında uyarı görünür.
 - "Ertele" kalıcıdır: Settings tablosunda saklanır, plan yenilense de korunur.
+- Hatırlatma şekli (onboarding'de seçilir, Ayarlar'dan değişir): bildirim ya
+  da arama. Arama modunda doz saati ve erteleme hatırlatması "Reddet /
+  Kabul et" ile çalar: Reddet ertelenir, Kabul et uygulamayı Bugün ekranında
+  açar (doz orada işaretlenir).
+  - iOS 26+ (alarm izni varsa): AlarmKit alarmı (`ios/Runner/CallAlarms.swift`);
+    Dynamic Island'da ve kilit ekranında çıkar, sessiz modu ve Odak'ı aşar.
+    Reddet uygulamayı açmadan erteleme alarmı kurar. Butonlar UserDefaults'a
+    yazılır, Dart açılışta/öne gelince işler (`applyAlarmActions`).
+  - Android, daha eski iOS ya da izin yoksa: zil sesli bildirim (Android'de
+    telefonun zil sesi, `calls` kanalı; iOS'ta `ios/Runner/ring.caf`).
 
 ## Geliştirme
 

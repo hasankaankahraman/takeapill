@@ -46,6 +46,22 @@ class FakeNotifications {
         });
   }
 
+  /// Kullanıcının bildirime ya da butonuna dokunmasını taklit eder.
+  Future<void> respond({String? actionId, required String payload}) =>
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+            _channel.name,
+            _channel.codec.encodeMethodCall(
+              MethodCall('didReceiveNotificationResponse', {
+                'notificationId': 0,
+                'actionId': actionId,
+                'payload': payload,
+                'notificationResponseType': actionId == null ? 0 : 1,
+              }),
+            ),
+            (_) {},
+          );
+
   void uninstall() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, null);

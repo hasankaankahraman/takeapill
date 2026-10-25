@@ -23,6 +23,9 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
   NotificationPrefs? _prefs;
   bool _exactAlarms = true;
 
+  /// iOS AlarmKit izni (bkz. [NotificationService.callAlarmState]).
+  String? _alarmState;
+
   /// İzin sistem ayarlarından açılıp dönülürse uyarı kalksın.
   late final AppLifecycleListener _lifecycle;
 
@@ -41,7 +44,14 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
 
   Future<void> _refreshExactAlarms() async {
     final exact = await NotificationService.exactAlarmsAllowed();
-    if (mounted && exact != _exactAlarms) setState(() => _exactAlarms = exact);
+    final alarm = await NotificationService.callAlarmState();
+    if (!mounted || (exact == _exactAlarms && alarm == _alarmState)) return;
+    setState(() {
+      _exactAlarms = exact;
+      _alarmState = alarm;
+    });
+    // Alarm izni sistem ayarlarından açıldıysa aramalar alarma geçsin.
+    await trySyncNotifications(ref.read(dbProvider));
   }
 
   Future<void> _load() async {
@@ -49,11 +59,13 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     final m = await db.loadMealTimes();
     final p = await db.loadNotificationPrefs();
     final exact = await NotificationService.exactAlarmsAllowed();
+    final alarm = await NotificationService.callAlarmState();
     if (!mounted) return;
     setState(() {
       _meals = m;
       _prefs = p;
       _exactAlarms = exact;
+      _alarmState = alarm;
     });
   }
 
@@ -150,6 +162,17 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
               const SectionLabel('Bildirimler'),
               GroupPanel(
                 children: [
+                  MenuRow<bool>(
+                    title: 'Hatırlatma şekli',
+                    value: p.callMode,
+                    options: const {false: 'Bildirim', true: 'Arama'},
+                    onChanged: (v) async {
+                      // Önce izin: plan, izne göre alarm ya da bildirimle kurulur.
+                      if (v) await NotificationService.requestCallPermission();
+                      await _savePrefs(p.copyWith(call: v));
+                      await _refreshExactAlarms();
+                    },
+                  ),
                   _minutesTile(
                     'Önceden haber ver',
                     p.leadMinutes,
@@ -210,6 +233,34 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                   ),
                 ],
               ),
+              if (p.callMode)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                  child: Text(
+                    'İlaç saatinde telefonun arama gibi çalar. Kabul edersen '
+                    'uygulama açılır, reddedersen ertelenir.',
+                    style: TextStyle(fontSize: 12, color: c.muted),
+                  ),
+                ),
+              if (p.callMode && _alarmState == 'denied')
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                  child: Text(
+                    'Alarm izni kapalı; arama Dynamic Island yerine bildirim '
+                    'olarak gelir. Açmak için: iPhone Ayarları › Take a Pill '
+                    '› Alarmlar.',
+                    style: TextStyle(fontSize: 12, color: c.warn),
+                  ),
+                ),
+              if (p.callMode && _alarmState == 'unsupported')
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                  child: Text(
+                    'Dynamic Island\'da arama için iOS 26 gerekir; bu cihazda '
+                    'arama, zil sesli bildirim olarak gelir.',
+                    style: TextStyle(fontSize: 12, color: c.muted),
+                  ),
+                ),
               if (!_exactAlarms)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),

@@ -34,8 +34,13 @@ Future<Widget> bootstrap({AppDatabase? db}) async {
   final theme = parseThemeMode(
     await database.getSetting(SettingKeys.themeMode),
   );
-  // Plan yenilenemese de uygulama açılmalı; bir sonraki açılışta tekrar denenir.
-  if (onboarded) await trySyncNotifications(database);
+  if (onboarded) {
+    // Kapalıyken iOS alarmında basılan "Reddet"ler planlanmadan önce ertelensin;
+    // "Kabul et" için ek iş yok, uygulama zaten Bugün'de açılır.
+    await NotificationService.applyAlarmActions(database);
+    // Plan yenilenemese de uygulama açılmalı; bir sonraki açılışta tekrar denenir.
+    await trySyncNotifications(database);
+  }
 
   final app = TakeAPillApp(router: buildRouter(onboarded: onboarded));
   return ProviderScope(

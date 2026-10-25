@@ -9,7 +9,8 @@ import 'onboarding_art.dart';
 import 'providers.dart';
 import 'theme.dart';
 
-/// Kaydırmalı karşılama: üç tanıtım sayfası ve izin istenen son sayfa.
+/// Kaydırmalı karşılama: üç tanıtım sayfası, hatırlatma şekli seçimi ve izin
+/// istenen son sayfa.
 class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key});
 
@@ -18,10 +19,13 @@ class WelcomeScreen extends ConsumerStatefulWidget {
 }
 
 class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
-  static const _count = 4;
+  static const _count = 5;
 
   final _pages = PageController();
   int _index = 0;
+
+  /// Hatırlatma şekli; isteğe bağlı, Ayarlar'dan değiştirilebilir.
+  bool _call = false;
 
   bool get _last => _index == _count - 1;
 
@@ -49,7 +53,10 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 
   Future<void> _start() async {
     final db = ref.read(dbProvider);
-    await NotificationService.requestPermissions();
+    final prefs = await db.loadNotificationPrefs();
+    await db.saveNotificationPrefs(prefs.copyWith(call: _call));
+    final ok = await NotificationService.requestPermissions();
+    if (ok && _call) await NotificationService.requestCallPermission();
     await db.setSetting(SettingKeys.onboarded, '1');
     if (mounted) context.go('/');
   }
@@ -77,6 +84,28 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
         body:
             'Aldığın ve atladığın dozlar kaydolur; uyum oranını Geçmiş '
             'sekmesinden takip edersin.',
+      ),
+      _SlideText(
+        title: 'Nasıl hatırlatalım?',
+        body: 'İstediğin zaman Ayarlar’dan değiştirebilirsin.',
+        footer: Column(
+          children: [
+            _ModeOption(
+              icon: Icons.notifications_none_rounded,
+              title: 'Bildirim',
+              text: 'Bildirimden “Aldım” ya da “Ertele” de.',
+              selected: !_call,
+              onTap: () => setState(() => _call = false),
+            ),
+            _ModeOption(
+              icon: Icons.call_rounded,
+              title: 'Arama',
+              text: 'Telefonun arama gibi çalar; kabul et ya da reddet.',
+              selected: _call,
+              onTap: () => setState(() => _call = true),
+            ),
+          ],
+        ),
       ),
       _SlideText(
         title: 'Hazırsan başlayalım.',
@@ -381,6 +410,98 @@ class _Backdrop extends CustomPainter {
   @override
   bool shouldRepaint(_Backdrop old) =>
       old.page != page || old.dark != dark || !listEquals(old.tints, tints);
+}
+
+/// Hatırlatma şekli seçeneği; seçili olan vurgu rengiyle çerçevelenir.
+class _ModeOption extends StatelessWidget {
+  const _ModeOption({
+    required this.icon,
+    required this.title,
+    required this.text,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String text;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    final r = BorderRadius.circular(18);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Semantics(
+        inMutuallyExclusiveGroup: true,
+        selected: selected,
+        child: Material(
+          color: c.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: r,
+            side: BorderSide(color: selected ? c.accent : c.surface, width: 2),
+          ),
+          child: InkWell(
+            borderRadius: r,
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: selected ? c.accentSoft : c.chip,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: selected ? c.onAccentSoft : c.muted,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          text,
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.35,
+                            color: c.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    selected
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: selected ? c.accent : c.line,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _Feature extends StatelessWidget {

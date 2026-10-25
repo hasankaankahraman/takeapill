@@ -1,7 +1,8 @@
-import 'dart:ui' show Color;
+import 'dart:async';
 
 import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
@@ -19,6 +20,17 @@ const _category = 'dose';
 const actionTaken = 'taken';
 const actionSnooze = 'snooze';
 const actionSkip = 'skip';
+
+const _callChannelId = 'calls';
+const _callCategory = 'call';
+const actionAnswer = 'answer';
+const actionDecline = 'decline';
+
+/// Android'de arama bu süre çalar, sonra cevapsız sayılır.
+const _callTimeout = Duration(seconds: 60);
+
+/// iOS 26+'da arama modunun AlarmKit alarmları (CallAlarms.swift).
+const _callChannel = MethodChannel('takeapill/call');
 
 /// Planlama penceresi; iOS 64 sınırı nedeniyle plan her açılışta yenilenir.
 const _horizonDays = 14;
@@ -55,11 +67,13 @@ Future<void> initTimezone() async {
 }
 
 /// Bildirim butonu / dokunuş işleyicisi. Ön ve arka planda aynı mantık.
+/// [at]: işlemin yapıldığı an (iOS alarm butonları sonradan işlenir).
 Future<void> handleNotificationAction(
   AppDatabase db,
   String? actionId,
-  String? payload,
-) async {
+  String? payload, {
+  DateTime? at,
+}) async {
   final decoded = decodePayload(payload);
   if (decoded == null) return;
   final (medId, doseAt) = decoded;
@@ -69,20 +83,31 @@ Future<void> handleNotificationAction(
       await db.recordDose(medId, doseAt, DoseStatus.taken);
     case actionSkip:
       await db.recordDose(medId, doseAt, DoseStatus.skipped);
-    case actionSnooze:
+    case actionSnooze || actionDecline:
       final prefs = await db.loadNotificationPrefs();
       final snoozes = await db.loadSnoozes();
-      snoozes[(medId, doseAt)] = clock.now().add(
+      snoozes[(medId, doseAt)] = (at ?? clock.now()).add(
         Duration(minutes: prefs.snoozeMinutes),
       );
       await db.saveSnoozes(snoozes);
     default:
-      return; // Gövdeye dokunma: uygulama açılır, işlem yok.
+      // Gövdeye dokunma ve "Kabul et": uygulama açılır, işlem yok.
+      return;
   }
   await syncNotifications(db);
 }
 
-NotificationDetails _details() => const NotificationDetails(
+/// "Kabul et" ya da arama bildirimine dokunma: uygulama Bugün'de açılır.
+bool _answers(NotificationResponse r) =>
+    isCallPayload(r.payload) &&
+    (r.actionId == null || r.actionId == actionAnswer);
+
+final _answered = StreamController<void>.broadcast();
+
+NotificationDetails _details({bool call = false}) =>
+    call ? _callDetails() : _doseDetails;
+
+const _doseDetails = NotificationDetails(
   android: AndroidNotificationDetails(
     _channelId,
     'İlaç hatırlatıcıları',
@@ -99,6 +124,42 @@ NotificationDetails _details() => const NotificationDetails(
   ),
   iOS: DarwinNotificationDetails(
     categoryIdentifier: _category,
+    presentAlert: true,
+    presentSound: true,
+    presentBadge: false,
+  ),
+);
+
+NotificationDetails _callDetails() => NotificationDetails(
+  android: AndroidNotificationDetails(
+    _callChannelId,
+    'İlaç aramaları',
+    channelDescription: 'Doz saatinde gelen arama gibi çalan hatırlatma',
+    importance: Importance.max,
+    priority: Priority.max,
+    category: AndroidNotificationCategory.call,
+    // Telefonun kendi zil sesi; FLAG_INSISTENT ile kapatılana dek tekrar eder.
+    sound: const UriAndroidNotificationSound(
+      'content://settings/system/ringtone',
+    ),
+    audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+    additionalFlags: Int32List.fromList([4]),
+    vibrationPattern: Int64List.fromList([0, 1000, 1000]),
+    timeoutAfter: _callTimeout.inMilliseconds,
+    color: const Color(0xFF0F766E),
+    actions: const [
+      AndroidNotificationAction(actionDecline, 'Reddet'),
+      AndroidNotificationAction(
+        actionAnswer,
+        'Kabul et',
+        showsUserInterface: true,
+      ),
+    ],
+  ),
+  // iOS 26 öncesi ya da alarm izni yokken; varsa AlarmKit alarmı kurulur.
+  iOS: const DarwinNotificationDetails(
+    categoryIdentifier: _callCategory,
+    sound: 'ring.caf',
     presentAlert: true,
     presentSound: true,
     presentBadge: false,
@@ -132,6 +193,21 @@ class NotificationService {
           requestBadgePermission: false,
           notificationCategories: [
             DarwinNotificationCategory(
+              _callCategory,
+              actions: [
+                DarwinNotificationAction.plain(
+                  actionDecline,
+                  'Reddet',
+                  options: {DarwinNotificationActionOption.destructive},
+                ),
+                DarwinNotificationAction.plain(
+                  actionAnswer,
+                  'Kabul et',
+                  options: {DarwinNotificationActionOption.foreground},
+                ),
+              ],
+            ),
+            DarwinNotificationCategory(
               _category,
               actions: [
                 DarwinNotificationAction.plain(actionTaken, 'Aldım'),
@@ -146,10 +222,90 @@ class NotificationService {
           ],
         ),
       ),
-      onDidReceiveNotificationResponse: (r) =>
-          handleNotificationAction(db, r.actionId, r.payload),
+      onDidReceiveNotificationResponse: (r) {
+        if (_answers(r)) _answered.add(null);
+        unawaited(handleNotificationAction(db, r.actionId, r.payload));
+      },
       onDidReceiveBackgroundNotificationResponse: notificationBackgroundHandler,
     );
+    // iOS alarmında butona uygulama açıkken basıldı.
+    _callChannel.setMethodCallHandler((c) async {
+      if (c.method != 'alarmActions') return;
+      if (await applyAlarmActions(db)) _answered.add(null);
+    });
+  }
+
+  /// Açık uygulamada aramaya "Kabul et" denildi (bildirim ya da iOS alarmı);
+  /// uygulama Bugün ekranına geçer.
+  static Stream<void> get answeredCalls => _answered.stream;
+
+  /// iOS alarmındaki butonlar uygulama kapalıyken basılmış olabilir:
+  /// "Reddet"leri ertelemeye çevirir; "Kabul et" varsa true döner.
+  static Future<bool> applyAlarmActions(AppDatabase db) async {
+    List<String> actions;
+    try {
+      actions =
+          await _callChannel.invokeListMethod<String>('takeAlarmActions') ??
+          const [];
+    } on MissingPluginException {
+      return false; // Android, testler
+    }
+    var answered = false;
+    for (final a in actions) {
+      // "eylem|payload|ms"; payload'ın kendisi de "|" içerir.
+      final parts = a.split('|');
+      if (parts.length < 3) continue;
+      final payload = parts.sublist(1, parts.length - 1).join('|');
+      final ms = int.tryParse(parts.last);
+      if (ms == null || decodePayload(payload) == null) continue;
+      switch (parts.first) {
+        case actionDecline:
+          await handleNotificationAction(
+            db,
+            actionDecline,
+            payload,
+            at: DateTime.fromMillisecondsSinceEpoch(ms),
+          );
+        case actionAnswer:
+          answered = true;
+      }
+    }
+    return answered;
+  }
+
+  /// iOS 26+: Dynamic Island'da ve kilit ekranında çalan alarm için AlarmKit
+  /// izni (sistem penceresi yalnızca ilk kez çıkar). Yoksa ve Android'de
+  /// arama, zil sesli bir bildirim olarak gelir.
+  static Future<void> requestCallPermission() async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+    try {
+      await _callChannel.invokeMethod<bool>('requestAlarms');
+    } on PlatformException catch (e) {
+      debugPrint('Alarm izni istenemedi: $e');
+    }
+  }
+
+  /// iOS'ta AlarmKit izni: "authorized", "notDetermined", "denied" ya da
+  /// iOS 26 öncesinde "unsupported". Diğer platformlarda null.
+  static Future<String?> callAlarmState() async {
+    if (defaultTargetPlatform != TargetPlatform.iOS) return null;
+    try {
+      return await _callChannel.invokeMethod<String>('alarmState');
+    } on PlatformException catch (e) {
+      debugPrint('Alarm durumu alınamadı: $e');
+    } on MissingPluginException {
+      // Testler
+    }
+    return null;
+  }
+
+  /// Arama modu açık ama alarm izni hiç sorulmamışsa (ör. mod önceki bir
+  /// sürümde seçildi) şimdi sorar ve planı alarmlarla yeniden kurar.
+  static Future<void> ensureCallAlarms(AppDatabase db) async {
+    if (await callAlarmState() != 'notDetermined') return;
+    if (!(await db.loadNotificationPrefs()).callMode) return;
+    await requestCallPermission();
+    await trySyncNotifications(db);
   }
 
   /// Tanılama/test: sistemde bekleyen ve teslim edilmiş bildirimler.
@@ -242,12 +398,36 @@ Future<void> _sync(AppDatabase db) async {
   };
   if (live.length != snoozes.length) await db.saveSnoozes(live);
 
+  final prefs = await db.loadNotificationPrefs();
   final plan = planNotifications(
     doses: pending,
     now: now,
-    prefs: await db.loadNotificationPrefs(),
+    prefs: prefs,
     snoozes: live,
   );
+  // iOS 26+ ve izin varsa aramalar bildirim yerine AlarmKit alarmı olur.
+  var alarms = await NotificationService.callAlarmState() == 'authorized';
+  if (alarms) {
+    try {
+      await _callChannel.invokeMethod<void>('scheduleAlarms', [
+        for (final n in plan)
+          if (n.call && n.at.isAfter(clock.now()))
+            {
+              'at': n.at.millisecondsSinceEpoch,
+              'title': _title(n.kind, n.medicationName),
+              'payload': n.payload,
+              'snoozeMinutes': prefs.snoozeMinutes,
+              'cancelIds': [
+                notificationId(n.medicationId, n.doseAt, NotifKind.nag),
+              ],
+            },
+      ]);
+    } on PlatformException catch (e) {
+      // Alarm kurulamazsa arama hiç çalmasın diye bildirime düşülür.
+      debugPrint('Arama alarmları kurulamadı, bildirim kullanılacak: $e');
+      alarms = false;
+    }
+  }
   // İzin yokken tam zamanlı kurulum hata verir; sistem birkaç dakika esnetsin.
   final mode = await NotificationService.exactAlarmsAllowed()
       ? AndroidScheduleMode.exactAllowWhileIdle
@@ -256,11 +436,11 @@ Future<void> _sync(AppDatabase db) async {
   await _plugin.cancelAll();
   for (final n in plan) {
     // Planlamadan bu yana zamanı geçmiş olabilir; eklenti geçmiş tarihi reddeder.
-    if (!n.at.isAfter(clock.now())) continue;
+    if (!n.at.isAfter(clock.now()) || (alarms && n.call)) continue;
     await _plugin.zonedSchedule(
       id: n.id,
       scheduledDate: tz.TZDateTime.from(n.at, tz.local),
-      notificationDetails: _details(),
+      notificationDetails: _details(call: n.call),
       androidScheduleMode: mode,
       title: _title(n.kind, n.medicationName),
       body: _body(n.kind, n.doseAt, n.food),

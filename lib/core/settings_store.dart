@@ -14,6 +14,7 @@ abstract final class SettingKeys {
   static const leadMinutes = 'notif.lead';
   static const nagMinutes = 'notif.nag';
   static const snoozeMinutes = 'notif.snooze';
+  static const callMode = 'notif.call';
   static const snoozes = 'notif.snoozes';
   static const onboarded = 'onboarded';
   static const themeMode = 'theme.mode';
@@ -50,6 +51,7 @@ extension SettingsAccess on AppDatabase {
       leadMinutes: await _int(SettingKeys.leadMinutes, d.leadMinutes),
       nagMinutes: await _int(SettingKeys.nagMinutes, d.nagMinutes),
       snoozeMinutes: await _int(SettingKeys.snoozeMinutes, d.snoozeMinutes),
+      callMode: await _int(SettingKeys.callMode, d.callMode ? 1 : 0) == 1,
     );
   }
 
@@ -57,6 +59,7 @@ extension SettingsAccess on AppDatabase {
     await setSetting(SettingKeys.leadMinutes, '${p.leadMinutes}');
     await setSetting(SettingKeys.nagMinutes, '${p.nagMinutes}');
     await setSetting(SettingKeys.snoozeMinutes, '${p.snoozeMinutes}');
+    await setSetting(SettingKeys.callMode, p.callMode ? '1' : '0');
   }
 
   /// Ertelemeler `[[ilaç, dozMs, ertelemeMs], ...]` olarak saklanır; böylece

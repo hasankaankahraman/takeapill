@@ -7,6 +7,7 @@ class NotificationPrefs {
     this.leadMinutes = 5,
     this.nagMinutes = 10,
     this.snoozeMinutes = 10,
+    this.callMode = false,
   });
 
   /// Dozdan kaç dk önce haber verilsin; 0 = kapalı.
@@ -16,11 +17,15 @@ class NotificationPrefs {
   final int nagMinutes;
   final int snoozeMinutes;
 
-  NotificationPrefs copyWith({int? lead, int? nag, int? snooze}) =>
+  /// Doz saati (ve erteleme sonrası) bildirim yerine gelen arama gibi çalar.
+  final bool callMode;
+
+  NotificationPrefs copyWith({int? lead, int? nag, int? snooze, bool? call}) =>
       NotificationPrefs(
         leadMinutes: lead ?? leadMinutes,
         nagMinutes: nag ?? nagMinutes,
         snoozeMinutes: snooze ?? snoozeMinutes,
+        callMode: call ?? callMode,
       );
 }
 
@@ -36,6 +41,7 @@ class PlannedNotification {
     required this.medicationName,
     required this.doseAt,
     required this.food,
+    this.call = false,
   });
 
   final int id;
@@ -46,15 +52,28 @@ class PlannedNotification {
   final DateTime doseAt;
   final FoodRelation food;
 
-  String get payload => encodePayload(medicationId, doseAt);
+  /// Arama olarak çalar (bkz. [NotificationPrefs.callMode]).
+  final bool call;
+
+  String get payload => encodePayload(medicationId, doseAt, call: call);
 }
 
-String encodePayload(int medicationId, DateTime doseAt) =>
-    '$medicationId|${doseAt.millisecondsSinceEpoch}';
+const _callSuffix = '|call';
+
+String encodePayload(int medicationId, DateTime doseAt, {bool call = false}) =>
+    '$medicationId|${doseAt.millisecondsSinceEpoch}${call ? _callSuffix : ''}';
+
+/// Android tarafı (MainActivity.kt) da bu son eki arar.
+bool isCallPayload(String? payload) => payload?.endsWith(_callSuffix) ?? false;
 
 (int, DateTime)? decodePayload(String? payload) {
   final parts = payload?.split('|');
-  if (parts == null || parts.length != 2) return null;
+  if (parts == null ||
+      parts.length < 2 ||
+      parts.length > 3 ||
+      (parts.length == 3 && !isCallPayload(payload))) {
+    return null;
+  }
   final id = int.tryParse(parts[0]);
   final ms = int.tryParse(parts[1]);
   if (id == null || ms == null) return null;
@@ -97,6 +116,9 @@ List<PlannedNotification> planNotifications({
         medicationName: name,
         doseAt: d.scheduledAt,
         food: d.food,
+        call:
+            prefs.callMode &&
+            (kind == NotifKind.due || kind == NotifKind.snooze),
       ),
     );
   }

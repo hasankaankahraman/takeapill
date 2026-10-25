@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -98,16 +100,29 @@ class TakeAPillApp extends ConsumerStatefulWidget {
 
 class _AppState extends ConsumerState<TakeAPillApp>
     with WidgetsBindingObserver {
+  late final StreamSubscription<void> _answers;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _answers = NotificationService.answeredCalls.listen((_) => _showToday());
+    // iOS: arama modu açık ama alarm izni hiç sorulmadıysa şimdi sor.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => NotificationService.ensureCallAlarms(ref.read(dbProvider)),
+    );
   }
 
   @override
   void dispose() {
+    _answers.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// Aramaya "Kabul et" denildi: dozun işaretleneceği Bugün ekranı.
+  void _showToday() {
+    if (widget.router.state.uri.path != '/welcome') widget.router.go('/');
   }
 
   /// Arka plandaki bildirim butonları başka isolate'te DB'yi değiştirmiş
@@ -118,7 +133,12 @@ class _AppState extends ConsumerState<TakeAPillApp>
       ref.invalidate(nowProvider);
       ref.invalidate(doseViewsProvider);
       ref.invalidate(medicationPlansProvider);
-      trySyncNotifications(ref.read(dbProvider));
+      final db = ref.read(dbProvider);
+      // Arka planda iOS alarmından "Kabul et" ya da "Reddet" basılmış olabilir.
+      NotificationService.applyAlarmActions(db).then((answered) {
+        if (answered) _showToday();
+        return trySyncNotifications(db);
+      });
     }
   }
 

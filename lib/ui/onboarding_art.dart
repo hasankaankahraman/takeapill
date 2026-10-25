@@ -12,6 +12,7 @@ List<Color> onboardingTints(BuildContext context) {
     c.accent,
     dark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
     c.ok,
+    dark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
     c.accent,
   ];
 }
@@ -95,6 +96,7 @@ class _OnboardingArtState extends State<OnboardingArt>
                         0 => _PillScene(k: k, tint: tint),
                         1 => _ReminderScene(k: k, tint: tint),
                         2 => _ProgressScene(k: k, tint: tint),
+                        3 => _CallScene(k: k, tint: tint),
                         _ => _PrivacyScene(k: k, tint: tint),
                       },
                     ],
@@ -915,7 +917,133 @@ class _RingPainter extends CustomPainter {
       old.value != value || old.color != color || old.track != track;
 }
 
-// --- 4. Gizlilik ------------------------------------------------------------
+// --- 4. Arama ---------------------------------------------------------------
+
+class _CallScene extends StatelessWidget {
+  const _CallScene({required this.k, required this.tint});
+
+  final _Clock k;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    // Her turda üç kez çalar: halkalar yayılır, simge kısa bir süre titrer.
+    final beat = (k.idle * 3) % 1;
+    final shake = beat < 0.25 ? math.sin(beat * 16 * math.pi) * 0.12 : 0.0;
+    return Stack(
+      alignment: Alignment.topCenter,
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          top: 0,
+          child: _Pop(
+            t: k.at(0.35, 0.7, Curves.easeOutBack),
+            child: _GlassChip(
+              icon: Icons.call_rounded,
+              text: 'Take a Pill arıyor…',
+              tint: tint,
+            ),
+          ),
+        ),
+        Positioned(
+          top: 58,
+          child: SizedBox(
+            width: 180,
+            height: 180,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                for (var i = 0; i < 2; i++)
+                  Builder(
+                    builder: (context) {
+                      final t = (beat + i / 2) % 1;
+                      return Container(
+                        width: 96 + 84 * t,
+                        height: 96 + 84 * t,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: tint.withValues(
+                              alpha: 0.4 * (1 - t) * k.at(0.4, 0.8),
+                            ),
+                            width: 2,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                Transform.rotate(
+                  angle: shake,
+                  child: Transform.scale(
+                    scale: k.at(0.05, 0.55, Curves.easeOutBack),
+                    child: Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [_lighten(tint, 0.25), _darken(tint, 0.15)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: tint.withValues(alpha: 0.4),
+                            blurRadius: 26,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.medication_rounded,
+                        color: Colors.white,
+                        size: 46,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          top: 236,
+          child: Row(
+            children: [
+              for (final (i, (icon, color)) in [
+                (Icons.call_end_rounded, const Color(0xFFEF4444)),
+                (Icons.call_rounded, const Color(0xFF22C55E)),
+              ].indexed) ...[
+                if (i > 0) const SizedBox(width: 92),
+                Transform.translate(
+                  // Yeşil düğme "aç beni" der gibi hafifçe zıplar.
+                  offset: Offset(0, i == 1 ? -3 * (k.wave(0, 3) + 1) / 2 : 0),
+                  child: _Pop(
+                    t: k.at(0.5 + 0.1 * i, 0.85 + 0.1 * i, Curves.easeOutBack),
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: color,
+                        border: Border.all(color: c.surface, width: 3),
+                        boxShadow: _softShadow(context),
+                      ),
+                      child: Icon(icon, color: Colors.white, size: 26),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// --- 5. Gizlilik ------------------------------------------------------------
 
 class _PrivacyScene extends StatelessWidget {
   const _PrivacyScene({required this.k, required this.tint});

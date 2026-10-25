@@ -72,6 +72,31 @@ void main() {
     expect(decodePayload(encodePayload(7, at)), (7, at));
     expect(decodePayload('bozuk'), isNull);
     expect(decodePayload(null), isNull);
+
+    final call = encodePayload(7, at, call: true);
+    expect(decodePayload(call), (7, at));
+    expect(isCallPayload(call), isTrue);
+    expect(isCallPayload(encodePayload(7, at)), isFalse);
+    expect(decodePayload('7|1|bozuk'), isNull);
+  });
+
+  test('arama modunda yalnızca doz saati ve erteleme arama olur', () {
+    final d = dose(1, DateTime(2026, 11, 2, 8));
+    const prefs = NotificationPrefs(callMode: true);
+    final r = planNotifications(doses: [(d, 'A')], now: now, prefs: prefs);
+    expect(
+      {for (final n in r) n.kind: n.call},
+      {NotifKind.lead: false, NotifKind.due: true, NotifKind.nag: false},
+    );
+    expect(isCallPayload(r[1].payload), isTrue);
+
+    final snoozed = planNotifications(
+      doses: [(d, 'A')],
+      now: DateTime(2026, 11, 2, 8, 5),
+      prefs: prefs,
+      snoozes: {(1, d.scheduledAt): DateTime(2026, 11, 2, 8, 15)},
+    );
+    expect(snoozed.single.call, isTrue);
   });
 
   test('ertelenen doz yalnızca erteleme bildirimi alır', () {

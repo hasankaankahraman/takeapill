@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:takeapill/bootstrap.dart';
 import 'package:takeapill/core/db/app_database.dart';
+import 'package:takeapill/core/notifications/notification_planner.dart';
+import 'package:takeapill/core/notifications/notification_service.dart';
 import 'package:takeapill/core/settings_store.dart';
 import 'package:takeapill/features/schedule/domain/rule_codec.dart';
 import 'package:takeapill/features/schedule/domain/schedule_models.dart';
@@ -88,8 +90,8 @@ void main() {
     await withClock(Clock.fixed(DateTime(2026, 11, 2, 7, 30)), () async {
       final db = await start(t);
 
-      // Karşılama ve izin
-      for (var i = 0; i < 3; i++) {
+      // Karşılama ve izin; hatırlatma şekli varsayılanda (bildirim) kalır.
+      for (var i = 0; i < 4; i++) {
         await t.tap(find.text('Devam'));
         await settle(t);
       }
@@ -99,6 +101,7 @@ void main() {
         fake.calls.map((c) => c.method),
         contains('requestNotificationsPermission'),
       );
+      expect((await t.runAsync(db.loadNotificationPrefs))!.callMode, isFalse);
       expect(find.text('Bugün için planlı ilaç yok.'), findsOneWidget);
 
       // Form: boş ad reddedilir
@@ -163,6 +166,53 @@ void main() {
       expect(await t.runAsync(db.activeSchedules), isEmpty);
       expect(fake.scheduled, isEmpty);
 
+      await finish(t, db);
+    });
+  });
+
+  testWidgets('karşılamada arama seçilir, Ayarlar\'dan kapatılır', (t) async {
+    final db = await start(t);
+    for (var i = 0; i < 3; i++) {
+      await t.tap(find.text('Devam'));
+      await settle(t);
+    }
+    expect(find.text('Nasıl hatırlatalım?'), findsOneWidget);
+    await t.tap(find.text('Arama'));
+    await settle(t);
+    await t.tap(find.text('Devam'));
+    await settle(t);
+    await t.tap(find.text('Başla ve bildirimlere izin ver'));
+    await settle(t);
+    expect((await t.runAsync(db.loadNotificationPrefs))!.callMode, isTrue);
+
+    await t.tap(find.text('Ayarlar'));
+    await settle(t);
+    expect(find.textContaining('arama gibi çalar'), findsOneWidget);
+    await t.tap(find.text('Hatırlatma şekli'));
+    await settle(t);
+    await t.tap(find.text('Bildirim').last);
+    await settle(t);
+    expect((await t.runAsync(db.loadNotificationPrefs))!.callMode, isFalse);
+    expect(find.textContaining('arama gibi çalar'), findsNothing);
+    await finish(t, db);
+  });
+
+  testWidgets('aramada "Kabul et" uygulamayı Bugün\'de açar', (t) async {
+    await withClock(Clock.fixed(DateTime(2026, 11, 2, 8)), () async {
+      final db = await t.runAsync(() async {
+        final db = await seeded([8 * 60]);
+        await db.saveNotificationPrefs(const NotificationPrefs(callMode: true));
+        return db;
+      }) as AppDatabase;
+      await start(t, db: db);
+      await t.tap(find.text('Ayarlar'));
+      await settle(t);
+
+      final payload = encodePayload(1, DateTime(2026, 11, 2, 8), call: true);
+      await fake.respond(actionId: actionAnswer, payload: payload);
+      await settle(t);
+      expect(find.text('Metformin'), findsOneWidget);
+      expect(find.text('Aldım'), findsOneWidget);
       await finish(t, db);
     });
   });

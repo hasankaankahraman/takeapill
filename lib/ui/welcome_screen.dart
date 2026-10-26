@@ -5,13 +5,14 @@ import 'package:go_router/go_router.dart';
 
 import '../core/notifications/notification_service.dart';
 import '../core/settings_store.dart';
+import 'form_rows.dart';
 import 'onboarding_art.dart';
 import 'permission_prompts.dart';
 import 'providers.dart';
 import 'theme.dart';
 
-/// Kaydırmalı karşılama: üç tanıtım sayfası, hatırlatma şekli seçimi ve izin
-/// istenen son sayfa.
+/// Kaydırmalı karşılama: üç tanıtım sayfası, ad, hatırlatma şekli seçimi ve
+/// izin istenen son sayfa.
 class WelcomeScreen extends ConsumerStatefulWidget {
   const WelcomeScreen({super.key});
 
@@ -20,9 +21,12 @@ class WelcomeScreen extends ConsumerStatefulWidget {
 }
 
 class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
-  static const _count = 5;
+  static const _count = 6;
 
   final _pages = PageController();
+
+  /// Selamlama ve bildirimlerde kullanılır; isteğe bağlı.
+  final _name = TextEditingController();
   int _index = 0;
 
   /// Hatırlatma şekli; isteğe bağlı, Ayarlar'dan değiştirilebilir.
@@ -37,6 +41,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   @override
   void dispose() {
     _pages.dispose();
+    _name.dispose();
     super.dispose();
   }
 
@@ -54,6 +59,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 
   Future<void> _start() async {
     final db = ref.read(dbProvider);
+    await ref.read(userNameProvider.notifier).set(_name.text);
     final prefs = await db.loadNotificationPrefs();
     await db.saveNotificationPrefs(prefs.copyWith(call: _call));
     final ok = await NotificationService.requestPermissions();
@@ -69,6 +75,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     final c = context.c;
     final tints = onboardingTints(context);
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final name = cleanUserName(_name.text);
     final slides = [
       const _SlideText(
         title: 'İlaçlarını unutma.',
@@ -89,6 +96,26 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             'sekmesinden takip edersin.',
       ),
       _SlideText(
+        title: 'Sana nasıl seslenelim?',
+        body: 'Hatırlatmaları adınla gönderelim. İstersen boş bırak.',
+        footer: DecoratedBox(
+          decoration: BoxDecoration(
+            color: c.surface,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: FieldRow(
+            key: const ValueKey('userName'),
+            controller: _name,
+            placeholder: 'Adın',
+            textCapitalization: TextCapitalization.words,
+            maxLength: userNameMaxLength,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) => setState(() {}),
+            onSubmitted: (_) => _go(_index + 1),
+          ),
+        ),
+      ),
+      _SlideText(
         title: 'Nasıl hatırlatalım?',
         body: 'İstediğin zaman Ayarlar’dan değiştirebilirsin.',
         footer: Column(
@@ -101,9 +128,9 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               onTap: () => setState(() => _call = false),
             ),
             _ModeOption(
-              icon: Icons.call_rounded,
-              title: 'Arama',
-              text: 'Telefonun arama gibi çalar; kabul et ya da reddet.',
+              icon: Icons.alarm_rounded,
+              title: 'Alarm',
+              text: 'Alarm gibi çalar; uygulamayı aç ya da ertele.',
               selected: _call,
               onTap: () => setState(() => _call = true),
             ),
@@ -111,7 +138,9 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
         ),
       ),
       _SlideText(
-        title: 'Hazırsan başlayalım.',
+        title: name == null
+            ? 'Hazırsan başlayalım.'
+            : 'Hazırsan başlayalım, $name.',
         footer: Column(
           children: [
             _Feature(
@@ -194,12 +223,20 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                   child: PageView.builder(
                     controller: _pages,
                     itemCount: _count,
-                    onPageChanged: (i) => setState(() => _index = i),
+                    onPageChanged: (i) {
+                      // Ad sayfasından çıkınca klavye kapansın.
+                      FocusScope.of(context).unfocus();
+                      setState(() => _index = i);
+                    },
                     itemBuilder: (context, i) => AnimatedBuilder(
                       animation: _pages,
                       builder: (context, _) => _Slide(
                         delta: _page - i,
-                        art: OnboardingArt(page: i, active: i == _index),
+                        art: OnboardingArt(
+                          page: i,
+                          active: i == _index,
+                          name: name,
+                        ),
                         text: slides[i],
                       ),
                     ),

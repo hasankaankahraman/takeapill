@@ -90,8 +90,8 @@ void main() {
     await withClock(Clock.fixed(DateTime(2026, 11, 2, 7, 30)), () async {
       final db = await start(t);
 
-      // Karşılama ve izin; hatırlatma şekli varsayılanda (bildirim) kalır.
-      for (var i = 0; i < 4; i++) {
+      // Karşılama ve izin; ad boş, hatırlatma şekli varsayılanda (bildirim).
+      for (var i = 0; i < 5; i++) {
         await t.tap(find.text('Devam'));
         await settle(t);
       }
@@ -104,39 +104,64 @@ void main() {
       expect((await t.runAsync(db.loadNotificationPrefs))!.callMode, isFalse);
       expect(find.text('Bugün için planlı ilaç yok.'), findsOneWidget);
 
-      // Form: boş ad reddedilir
+      // Form, adım adım: boş adla ilerlenmez
       await t.tap(find.text('İlk ilacını ekle'));
       await settle(t);
-      await t.tap(find.text('Kaydet').first);
+      expect(find.text('Hangi ilaç?'), findsOneWidget);
+      await t.tap(find.text('Devam'));
       await settle(t);
       expect(find.text('İlaç adı gerekli'), findsOneWidget);
+      expect(find.text('Hangi ilaç?'), findsOneWidget);
 
       await t.enterText(find.byKey(const ValueKey('name')), 'Metformin');
       await settle(t);
       expect(find.text('İlaç adı gerekli'), findsNothing);
+      await t.tap(find.text('Kapsül'));
+      await t.tap(find.text('Devam'));
+      await settle(t);
+
+      // Doz: önizleme seçilen formu ve dozu gösterir
+      await t.enterText(find.byKey(const ValueKey('amount')), '500');
+      await settle(t);
+      expect(find.text('Kapsül · 500 mg'), findsOneWidget);
+      await t.tap(find.text('Devam'));
+      await settle(t);
+
+      // Zamanlama: saat seçici iki platformda aynı panel
+      expect(find.text('Ne zaman?'), findsOneWidget);
+      await t.tap(find.text('08:00'));
+      await settle(t);
+      expect(find.text('Tamam'), findsOneWidget);
+      await t.tap(find.text('Akşam'));
+      await settle(t);
+      expect(find.text('19:00'), findsWidgets);
+      await t.tap(find.text('Sabah'));
+      await settle(t);
+      await t.tap(find.text('Tamam'));
+      await settle(t);
+      expect(find.text('08:00'), findsOneWidget);
+
+      // Geri tuşu önceki adıma döner, değerler korunur
+      await t.tap(find.byTooltip('Geri'));
+      await settle(t);
+      expect(find.text('Kapsül · 500 mg'), findsOneWidget);
+      await t.tap(find.text('Devam'));
+      await settle(t);
+      await t.tap(find.text('Devam'));
+      await settle(t);
 
       // Tarih seçici Türkçe
-      await t.scrollUntilVisible(
-        find.text('Başlangıç'),
-        200,
-        // Formun listesi; metin alanlarının kendi kaydırıcıları değil.
-        scrollable: find
-            .ancestor(
-              of: find.byKey(const ValueKey('name')),
-              matching: find.byType(Scrollable),
-            )
-            .first,
-      );
-      await t.ensureVisible(find.text('Başlangıç'));
-      await settle(t);
       await t.tap(find.text('Başlangıç'));
       await settle(t);
       expect(find.text('İptal'), findsOneWidget);
       await t.tap(find.text('İptal'));
       await settle(t);
 
-      await t.tap(find.text('Kaydet').first);
+      await t.tap(find.text('Kaydet'));
       await settle(t);
+      final saved = await t.runAsync(db.activeSchedules);
+      expect(saved!.single.$1.form, 'capsule');
+      expect(saved.single.$1.strength, '500 mg');
 
       // Bugün: 08:00 dozu sıradaki, 30 dk kaldı; bildirimleri kuruldu
       expect(find.text('Metformin'), findsOneWidget);
@@ -158,7 +183,7 @@ void main() {
       await settle(t);
       expect(find.text('Günde 1 kez'), findsOneWidget);
       expect(find.text('08:00'), findsOneWidget);
-      await t.drag(find.text('Metformin'), const Offset(-500, 0));
+      await t.drag(find.text('Metformin 500 mg'), const Offset(-500, 0));
       await settle(t);
       await t.tap(find.text('Sil'));
       await settle(t);
@@ -170,14 +195,76 @@ void main() {
     });
   });
 
-  testWidgets('karşılamada arama seçilir, Ayarlar\'dan kapatılır', (t) async {
+  testWidgets(
+    'karşılamada girilen ad selamlamada ve bildirimlerde kullanılır',
+    (t) async {
+      await withClock(Clock.fixed(DateTime(2026, 11, 2, 7, 30)), () async {
+        final db = await start(t);
+        for (var i = 0; i < 3; i++) {
+          await t.tap(find.text('Devam'));
+          await settle(t);
+        }
+        expect(find.text('Sana nasıl seslenelim?'), findsOneWidget);
+        await t.enterText(find.byKey(const ValueKey('userName')), '  Zeynep ');
+        await settle(t);
+        // Görseldeki bildirim önizlemesi yazıldıkça güncellenir.
+        expect(find.text('Zeynep, ilaç vaktin geldi'), findsOneWidget);
+        for (var i = 0; i < 2; i++) {
+          await t.tap(find.text('Devam'));
+          await settle(t);
+        }
+        expect(find.text('Hazırsan başlayalım, Zeynep.'), findsOneWidget);
+        await t.tap(find.text('Başla ve bildirimlere izin ver'));
+        await settle(t);
+        expect(await t.runAsync(db.loadUserName), 'Zeynep');
+        expect(find.text('Günaydın, Zeynep'), findsOneWidget);
+        await finish(t, db);
+      });
+    },
+  );
+
+  testWidgets('Ayarlar\'dan silinen adla genel başlık ve bildirimler', (
+    t,
+  ) async {
+    await withClock(Clock.fixed(DateTime(2026, 11, 2, 7, 30)), () async {
+      final db = await t.runAsync(() async {
+        final db = await seeded([8 * 60]);
+        await db.saveUserName('Zeynep');
+        await syncNotifications(db);
+        return db;
+      }) as AppDatabase;
+      await start(t, db: db);
+      expect(find.text('Günaydın, Zeynep'), findsOneWidget);
+      expect(fake.titles, contains('Zeynep, ilaç vaktin geldi'));
+
+      await t.tap(find.text('Ayarlar'));
+      await settle(t);
+      await t.enterText(find.byKey(const ValueKey('userName')), '');
+      await settle(t, 12);
+      expect(await t.runAsync(db.loadUserName), isNull);
+      expect(fake.titles, contains('İlaç zamanı: Metformin'));
+
+      await t.tap(find.text('Bugün').last);
+      await settle(t);
+      expect(
+        find.descendant(
+          of: find.byType(PageHeader),
+          matching: find.text('Bugün'),
+        ),
+        findsOneWidget,
+      );
+      await finish(t, db);
+    });
+  });
+
+  testWidgets('karşılamada alarm seçilir, Ayarlar\'dan kapatılır', (t) async {
     final db = await start(t);
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 4; i++) {
       await t.tap(find.text('Devam'));
       await settle(t);
     }
     expect(find.text('Nasıl hatırlatalım?'), findsOneWidget);
-    await t.tap(find.text('Arama'));
+    await t.tap(find.text('Alarm'));
     await settle(t);
     await t.tap(find.text('Devam'));
     await settle(t);
@@ -187,17 +274,17 @@ void main() {
 
     await t.tap(find.text('Ayarlar'));
     await settle(t);
-    expect(find.textContaining('arama gibi çalar'), findsOneWidget);
+    expect(find.textContaining('İlaç saatinde alarm çalar'), findsOneWidget);
     await t.tap(find.text('Hatırlatma şekli'));
     await settle(t);
     await t.tap(find.text('Bildirim').last);
     await settle(t);
     expect((await t.runAsync(db.loadNotificationPrefs))!.callMode, isFalse);
-    expect(find.textContaining('arama gibi çalar'), findsNothing);
+    expect(find.textContaining('İlaç saatinde alarm çalar'), findsNothing);
     await finish(t, db);
   });
 
-  testWidgets('aramada "Kabul et" uygulamayı Bugün\'de açar', (t) async {
+  testWidgets('alarmda "Aç" uygulamayı Bugün\'de açar', (t) async {
     await withClock(Clock.fixed(DateTime(2026, 11, 2, 8)), () async {
       final db = await t.runAsync(() async {
         final db = await seeded([8 * 60]);
@@ -265,7 +352,7 @@ void main() {
   ) async {
     fake.exactAlarmsAllowed = false;
     final db = await start(t);
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < 5; i++) {
       await t.tap(find.text('Devam'));
       await settle(t);
     }
@@ -294,6 +381,41 @@ void main() {
     await settle(t);
     expect(find.textContaining('birkaç dakika gecikebilir'), findsOneWidget);
     await finish(t, db);
+  });
+
+  testWidgets('düzenlerken adım çubuğuyla atlanır, her adımdan kaydedilir', (
+    t,
+  ) async {
+    await withClock(Clock.fixed(DateTime(2026, 11, 2, 7, 30)), () async {
+      final db = await t.runAsync(() => seeded([8 * 60])) as AppDatabase;
+      await start(t, db: db);
+      await t.tap(find.text('İlaçlar'));
+      await settle(t);
+      await t.tap(find.text('Metformin'));
+      await settle(t);
+      expect(find.text('İlacı düzenle'), findsOneWidget);
+      expect(find.text('Hangi ilaç?'), findsOneWidget);
+
+      // İleri adıma doğrudan geçilir; saat değiştirilip üstten kaydedilir.
+      await t.tap(find.text('Zamanlama'));
+      await settle(t);
+      expect(find.text('Ne zaman?'), findsOneWidget);
+      await t.tap(find.text('08:00'));
+      await settle(t);
+      await t.tap(find.text('Gece'));
+      await settle(t);
+      await t.tap(find.text('Tamam'));
+      await settle(t);
+      await t.tap(find.text('Kaydet').first);
+      await settle(t);
+
+      expect(find.text('22:00'), findsOneWidget);
+      final rule = decodeRule(
+        (await t.runAsync(db.activeSchedules))!.single.$2,
+      );
+      expect((rule as DailyRule).slots.single.fixedMinutes, 22 * 60);
+      await finish(t, db);
+    });
   });
 
   testWidgets('saat ilerledikçe doz "Gecikti"ye döner', (t) async {

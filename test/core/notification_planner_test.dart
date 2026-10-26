@@ -121,7 +121,7 @@ void main() {
     expect(decodePayload('7|1|bozuk'), isNull);
   });
 
-  test('arama modunda yalnızca doz saati ve erteleme arama olur', () {
+  test('alarm modunda yalnızca doz saati ve erteleme alarm olur', () {
     final d = dose(1, DateTime(2026, 11, 2, 8));
     const prefs = NotificationPrefs(callMode: true);
     final r = planNotifications(doses: [(d, 'A')], now: now, prefs: prefs);

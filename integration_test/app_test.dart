@@ -41,7 +41,12 @@ void main() {
     await t.scrollUntilVisible(
       f,
       200,
-      scrollable: find.byType(Scrollable).first,
+      // Formun sayfaları yatay bir PageView'da; kaydırılacak olan dikey liste.
+      scrollable: find
+          .byWidgetPredicate(
+            (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+          )
+          .first,
     );
     await settle(t, 2);
   }
@@ -54,7 +59,8 @@ void main() {
     // --- Karşılama + izin ---
     expect(find.text('Take a Pill'), findsOneWidget);
     await shot(t, '10_welcome');
-    for (var i = 0; i < 3; i++) {
+    // Beş sayfa; ad boş, hatırlatma şekli varsayılanda (bildirim) kalır.
+    for (var i = 0; i < 5; i++) {
       await t.tap(find.text('Devam'));
       await settle(t, 3);
     }
@@ -70,16 +76,23 @@ void main() {
     await t.tap(find.text('İlaç ekle'));
     await settle(t);
 
-    // Boş kaydetmeyi doğrula
-    await t.tap(find.text('Kaydet').last);
+    // Boş adla ilerlenmez
+    await t.tap(find.text('Devam'));
     await settle(t);
     expect(find.text('İlaç adı gerekli'), findsOneWidget);
 
     await t.enterText(find.byKey(const ValueKey('name')), 'Metformin');
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await settle(t);
+    await t.tap(find.text('Devam'));
+    await settle(t);
+
     // Birim menüsü varsayılan olarak "mg".
     await t.enterText(find.byKey(const ValueKey('amount')), '500');
     await t.enterText(find.byKey(const ValueKey('purpose')), 'Şeker');
     await t.testTextInput.receiveAction(TextInputAction.done);
+    await settle(t);
+    await t.tap(find.text('Devam'));
     await settle(t);
 
     await scrollTo(t, find.text('Doz saati ekle'));
@@ -96,7 +109,9 @@ void main() {
     await settle(t);
     await shot(t, '12_form');
 
-    await t.tap(find.text('Kaydet').first);
+    await t.tap(find.text('Devam'));
+    await settle(t);
+    await t.tap(find.text('Kaydet'));
     await settle(t, 10);
     expect(find.text('Metformin 500 mg'), findsOneWidget);
     await shot(t, '13_meds_list');
@@ -112,8 +127,10 @@ void main() {
     var pending = await NotificationService.pending();
     expect(
       pending.length,
-      60,
-      reason: '14 gün × 2 doz × 3 bildirim > 60, sınırlanmalı',
+      61,
+      reason:
+          '14 gün × 2 doz × 3 bildirim > 60, sınırlanmalı; '
+          'artı "uygulamayı aç" hatırlatması',
     );
     final ids = pending.map((e) => e.id).toSet();
     expect(ids.length, pending.length, reason: 'kimlikler benzersiz olmalı');

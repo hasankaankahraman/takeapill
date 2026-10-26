@@ -1,7 +1,10 @@
-Take a Pill, ilaçlarını, haplarını ve vitaminlerini zamanında almanı sağlayan sade bir ilaç hatırlatıcı. İlacın saatini, dozunu ve yemekle ilişkisini bir kez gir; zamanı gelince bildirimle haber verelim. Hesap açman gerekmez, reklam yoktur ve tüm verilerin yalnızca senin cihazında kalır.
+Take a Pill, ilaçlarını, haplarını ve vitaminlerini zamanında almanı sağlayan sade bir ilaç hatırlatıcı ve ilaç alarmı uygulaması. İlacın saatini, dozunu ve yemekle ilişkisini bir kez gir; ilaç saati gelince bildirimle ya da alarmla haber verelim. Hesap açman gerekmez, reklam yoktur ve tüm verilerin yalnızca senin telefonunda kalır.
+
+İLAÇ ALARMI: SESSİZ MODDA BİLE DUY
+Bildirimi kaçıranlar için alarm modu: ilaç saatinde telefonun alarm sesi çalar, sessiz ya da titreşim modundayken de duyulur. "Ertele" dersen alarm biraz sonra yeniden çalar, "Aç" dersen uygulama açılır ve dozunu tek dokunuşla işaretlersin. Hatırlatma şeklini istediğin zaman ayarlardan değiştirebilirsin.
 
 İLACINI UNUTMA
-• Günde bir ya da birkaç kez, belirlediğin saatlerde hatırlatma
+• Günde bir ya da birkaç kez, belirlediğin saatlerde ilaç hatırlatma
 • Haftanın belirli günlerinde ya da birkaç günde bir kullanılan ilaçlar
 • "Her 8 saatte bir" gibi saat aralıklı dozlar, örneğin antibiyotik kürleri
 • Gerektiğinde alınan ilaçlar için günlük üst sınır takibi
@@ -17,24 +20,24 @@ ZAMANINDA BİLDİRİM
 • Bildirimden doğrudan Aldım, Ertele ya da Atla
 • Erteleme süresini kendin seç
 
-BUGÜN VE GEÇMİŞ
+İLAÇ TAKİBİ: BUGÜN VE GEÇMİŞ
 • Günün tüm dozları tek ekranda, sıradaki ilaç her zaman önde
 • Geciken dozlar için uyarı
 • Aldığın, atladığın ve kaçırdığın dozların geçmişi
 • Uyum oranınla ilacını ne kadar düzenli kullandığını gör
 
 HER TÜR İLAÇ İÇİN
-Hap, tablet, kapsül, şurup, damla, iğne, krem ve solunum ilaçlarını ekleyebilirsin. Tansiyon, şeker (diyabet), tiroid ve kolesterol ilaçları, antibiyotikler, doğum kontrol hapı, vitamin ve takviyeler gibi düzenli ya da kür şeklinde kullandığın her şey için uygundur.
+Hap, tablet, kapsül, şurup, damla, iğne, krem ve solunum ilaçlarını ekleyebilirsin. Tansiyon, şeker (diyabet), tiroid ve kolesterol ilaçları, antibiyotikler, doğum kontrol hapı, vitamin ve takviyeler gibi düzenli ya da kür şeklinde kullandığın her şey için bir hap hatırlatıcı.
 
 KİMLER İÇİN?
 • İlacını almayı sık sık unutanlar
 • Birden fazla ilacı farklı saatlerde kullananlar
 • Doğum kontrol hapını her gün aynı saatte alması gerekenler
 • Anne babasının ya da büyüklerinin telefonuna sade bir ilaç alarmı kurmak isteyenler
-• D vitamini, demir, omega-3 gibi takviyeleri düzenli almak isteyenler
+• D vitamini, demir, omega-3 gibi takviyeler için vitamin hatırlatıcı arayanlar
 
 GİZLİLİK
 Hesap yok, sunucu yok, reklam yok. İlaçların ve geçmişin yalnızca bu cihazda saklanır; hiçbir veri toplanmaz ya da paylaşılmaz.
 
 ÖNEMLİ
-Take a Pill bir hatırlatma aracıdır; tıbbi tavsiye vermez, teşhis ya da tedavi amacı taşımaz. İlaç kullanımınla ilgili kararlar için doktoruna ya da eczacına danış.
+Take a Pill bir ilaç hatırlatıcıdır; tıbbi tavsiye vermez, teşhis ya da tedavi amacı taşımaz. İlaç kullanımınla ilgili kararlar için doktoruna ya da eczacına danış.

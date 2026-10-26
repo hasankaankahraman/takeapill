@@ -1,1 +1,1 @@
-Take a Pill'in ilk sürümü: ilaç ve hap hatırlatma, yemek saatine göre plan, bildirimden Aldım / Ertele / Atla ve uyum geçmişi.
+Take a Pill'in ilk sürümü: ilaç hatırlatıcı ve ilaç alarmı, yemek saatine göre plan, bildirimden Aldım / Ertele / Atla ve uyum geçmişi.

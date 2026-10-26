@@ -186,7 +186,7 @@ const _shots = [
     'Saat, doz ve aç/tok durumu;\nyemek saatine göre plan.',
     _graphite,
     route: '/meds',
-    push: '/med?id=3',
+    push: '/med?id=3&step=2',
   ),
   _Shot(
     '04-ilaclar',

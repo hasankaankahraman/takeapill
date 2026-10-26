@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../core/labels.dart';
 import 'theme.dart';
+import 'time_picker.dart';
 import 'widgets.dart';
 
 /// iOS ayarlarındaki gibi gruplu bölüm: üstte başlık, altta açıklama.
@@ -79,7 +80,10 @@ class FieldRow extends StatelessWidget {
     this.maxLines = 1,
     this.maxLength,
     this.onChanged,
+    this.textInputAction,
+    this.onSubmitted,
     this.trailing,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
@@ -90,7 +94,10 @@ class FieldRow extends StatelessWidget {
   final int maxLines;
   final int? maxLength;
   final ValueChanged<String>? onChanged;
+  final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
   final Widget? trailing;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -120,13 +127,17 @@ class FieldRow extends StatelessWidget {
             inputFormatters: formatters,
             cursorColor: c.accent,
             onChanged: onChanged,
+            textInputAction: textInputAction,
+            onSubmitted: onSubmitted,
+            autofocus: autofocus,
           )
         : TextField(
             controller: controller,
+            // Temanın odak çerçevesi kenarlıksız satıra sızmasın.
             decoration: InputDecoration.collapsed(
               hintText: placeholder,
               hintStyle: hint,
-            ),
+            ).copyWith(focusedBorder: InputBorder.none),
             style: style.copyWith(color: c.ink),
             textAlign: align,
             keyboardType: keyboardType,
@@ -135,6 +146,9 @@ class FieldRow extends StatelessWidget {
             minLines: 1,
             inputFormatters: formatters,
             onChanged: onChanged,
+            textInputAction: textInputAction,
+            onSubmitted: onSubmitted,
+            autofocus: autofocus,
           );
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 52),
@@ -280,7 +294,8 @@ class _MenuButtonState<T> extends State<MenuButton<T>> {
   }
 }
 
-/// Saat satırı; değer gece yarısından itibaren dakika.
+/// Saat satırı; değer gece yarısından itibaren dakika. İki platformda da
+/// aynı saat seçici açılır (bkz. [showTimeSheet]).
 class TimeRow extends StatelessWidget {
   const TimeRow({
     super.key,
@@ -294,21 +309,22 @@ class TimeRow extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   @override
-  Widget build(BuildContext context) => _PickerRow(
+  Widget build(BuildContext context) => PanelRow(
     title: title,
-    label: fmtMinutes(minutes),
-    semantics: 'Saat ${fmtMinutes(minutes)}',
-    mode: CupertinoDatePickerMode.time,
-    value: DateTime(2000, 1, 1, (minutes ~/ 60) % 24, minutes % 60),
-    onChanged: (d) => onChanged(d.hour * 60 + d.minute),
-    dialog: () => pickMinutes(context, minutes).then((m) {
+    onTap: () async {
+      final m = await showTimeSheet(context, minutes, title: title);
       if (m != null) onChanged(m);
-    }),
+    },
+    trailing: _ValueBox(
+      label: fmtMinutes(minutes),
+      semantics: 'Saat ${fmtMinutes(minutes)}',
+    ),
   );
 }
 
-/// Tarih satırı.
-class DateRow extends StatelessWidget {
+/// Tarih satırı. iOS'un sıkışık tarih seçicisi gibi: dokununca çark satırın
+/// altında açılır. Android'de sistem diyaloğu açılır.
+class DateRow extends StatefulWidget {
   const DateRow({
     super.key,
     required this.title,
@@ -321,72 +337,28 @@ class DateRow extends StatelessWidget {
   final ValueChanged<DateTime> onChanged;
 
   @override
-  Widget build(BuildContext context) => _PickerRow(
-    title: title,
-    label: DateFormat('d MMM y', 'tr').format(date),
-    mode: CupertinoDatePickerMode.date,
-    value: date,
-    onChanged: (d) => onChanged(DateTime(d.year, d.month, d.day)),
-    dialog: () => pickDate(context, date).then((d) {
-      if (d != null) onChanged(d);
-    }),
-  );
+  State<DateRow> createState() => _DateRowState();
 }
 
-/// iOS'un sıkışık tarih seçicisi gibi: sağda gri kutuda değer, dokununca
-/// çark satırın altında açılır. Android'de sistem diyaloğu açılır.
-class _PickerRow extends StatefulWidget {
-  const _PickerRow({
-    required this.title,
-    required this.label,
-    required this.mode,
-    required this.value,
-    required this.onChanged,
-    required this.dialog,
-    this.semantics,
-  });
-
-  final String title;
-  final String label;
-  final String? semantics;
-  final CupertinoDatePickerMode mode;
-  final DateTime value;
-  final ValueChanged<DateTime> onChanged;
-  final VoidCallback dialog;
-
-  @override
-  State<_PickerRow> createState() => _PickerRowState();
-}
-
-class _PickerRowState extends State<_PickerRow> {
+class _DateRowState extends State<DateRow> {
   bool _open = false;
 
   @override
   Widget build(BuildContext context) {
-    final c = context.c;
     final apple = isApple(context);
-    void tap() => apple ? setState(() => _open = !_open) : widget.dialog();
+    void tap() => apple
+        ? setState(() => _open = !_open)
+        : pickDate(context, widget.date).then((d) {
+            if (d != null) widget.onChanged(d);
+          });
     return Column(
       children: [
         PanelRow(
           title: widget.title,
           onTap: tap,
-          trailing: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-            decoration: BoxDecoration(
-              color: c.chip,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              widget.label,
-              semanticsLabel: widget.semantics,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                fontFeatures: const [FontFeature.tabularFigures()],
-                color: _open ? c.accent : c.ink,
-              ),
-            ),
+          trailing: _ValueBox(
+            label: DateFormat('d MMM y', 'tr').format(widget.date),
+            active: _open,
           ),
         ),
         AnimatedSize(
@@ -396,21 +368,48 @@ class _PickerRowState extends State<_PickerRow> {
               ? SizedBox(
                   height: 216,
                   child: CupertinoDatePicker(
-                    mode: widget.mode,
-                    use24hFormat: true,
-                    initialDateTime: widget.value,
-                    minimumDate: widget.mode == CupertinoDatePickerMode.date
-                        ? DateTime(2020)
-                        : null,
-                    maximumDate: widget.mode == CupertinoDatePickerMode.date
-                        ? DateTime(2100)
-                        : null,
-                    onDateTimeChanged: widget.onChanged,
+                    mode: CupertinoDatePickerMode.date,
+                    initialDateTime: widget.date,
+                    minimumDate: DateTime(2020),
+                    maximumDate: DateTime(2100),
+                    onDateTimeChanged: (d) =>
+                        widget.onChanged(DateTime(d.year, d.month, d.day)),
                   ),
                 )
               : const SizedBox(width: double.infinity),
         ),
       ],
+    );
+  }
+}
+
+/// Satırın sağındaki gri kutuda değer.
+class _ValueBox extends StatelessWidget {
+  const _ValueBox({required this.label, this.semantics, this.active = false});
+
+  final String label;
+  final String? semantics;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+      decoration: BoxDecoration(
+        color: c.chip,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        semanticsLabel: semantics,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          fontFeatures: const [FontFeature.tabularFigures()],
+          color: active ? c.accent : c.ink,
+        ),
+      ),
     );
   }
 }

@@ -25,8 +25,10 @@ GoRouter buildRouter({required bool onboarded}) => GoRouter(
     GoRoute(
       path: '/med',
       pageBuilder: (context, state) {
+        final query = state.uri.queryParameters;
         final form = MedicationFormScreen(
-          medicationId: int.tryParse(state.uri.queryParameters['id'] ?? ''),
+          medicationId: int.tryParse(query['id'] ?? ''),
+          initialStep: int.tryParse(query['step'] ?? '') ?? 0,
         );
         // iOS'ta form, arkadaki ekranı küçülten bir sayfa olarak alttan açılır.
         return isApple(context)
@@ -107,7 +109,7 @@ class _AppState extends ConsumerState<TakeAPillApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _answers = NotificationService.answeredCalls.listen((_) => _showToday());
-    // iOS: arama modu açık ama alarm izni hiç sorulmadıysa şimdi sor.
+    // iOS: alarm modu açık ama alarm izni hiç sorulmadıysa şimdi sor.
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => NotificationService.ensureCallAlarms(ref.read(dbProvider)),
     );
@@ -120,7 +122,7 @@ class _AppState extends ConsumerState<TakeAPillApp>
     super.dispose();
   }
 
-  /// Aramaya "Kabul et" denildi: dozun işaretleneceği Bugün ekranı.
+  /// Alarma "Aç" denildi: dozun işaretleneceği Bugün ekranı.
   void _showToday() {
     if (widget.router.state.uri.path != '/welcome') widget.router.go('/');
   }
@@ -135,7 +137,7 @@ class _AppState extends ConsumerState<TakeAPillApp>
       ref.invalidate(medicationPlansProvider);
       ref.invalidate(notificationsEnabledProvider);
       final db = ref.read(dbProvider);
-      // Arka planda iOS alarmından "Kabul et" ya da "Reddet" basılmış olabilir.
+      // Arka planda iOS alarmından "Aç" ya da "Ertele" basılmış olabilir.
       NotificationService.applyAlarmActions(db).then((answered) {
         if (answered) _showToday();
         return trySyncNotifications(db);

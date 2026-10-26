@@ -4,8 +4,8 @@ import Flutter
 import SwiftUI
 import UserNotifications
 
-/// Arama modu, iOS 26+: doz saatinde Dynamic Island'da ve kilit ekranında
-/// "Reddet" / "Kabul et" butonlu alarm (AlarmKit). Dart tarafı
+/// Alarm modu, iOS 26+: doz saatinde Dynamic Island'da ve kilit ekranında
+/// "Ertele" / "Aç" butonlu alarm (AlarmKit). Dart tarafı
 /// notification_service.dart; daha eski iOS'ta orası bildirime düşer.
 enum CallAlarms {
   static let channelName = "takeapill/call"
@@ -77,15 +77,15 @@ enum CallAlarms {
     let alert = AlarmPresentation.Alert(
       title: LocalizedStringResource(stringLiteral: spec.title),
       stopButton: AlarmButton(
-        text: "Reddet", textColor: .white, systemImageName: "phone.down.fill"),
+        text: "Ertele", textColor: .white, systemImageName: "zzz"),
       secondaryButton: AlarmButton(
-        text: "Kabul et", textColor: .white, systemImageName: "phone.fill"),
+        text: "Aç", textColor: .white, systemImageName: "pills.fill"),
       secondaryButtonBehavior: .custom
     )
     let attributes = AlarmAttributes<CallMetadata>(
       presentation: AlarmPresentation(alert: alert),
       metadata: CallMetadata(),
-      tintColor: Color(red: 0.13, green: 0.77, blue: 0.37)
+      tintColor: Color(red: 0.06, green: 0.46, blue: 0.43)
     )
     _ = try await AlarmManager.shared.schedule(
       id: UUID(),
@@ -94,7 +94,7 @@ enum CallAlarms {
         attributes: attributes,
         stopIntent: DeclineCallIntent(spec),
         secondaryIntent: AnswerCallIntent(payload: spec.payload),
-        sound: .named("ring.caf")
+        sound: .named("alarm.caf")
       )
     )
   }
@@ -115,7 +115,7 @@ struct CallSpec {
   let title: String
   let payload: String
   let snoozeMinutes: Int
-  /// Reddedilince kaldırılacak bekleyen bildirimler ("Aldın mı?").
+  /// Ertelenince kaldırılacak bekleyen bildirimler ("Aldın mı?").
   let cancelIds: [String]
 
   init(at: Date, title: String, payload: String, snoozeMinutes: Int, cancelIds: [String]) {
@@ -145,11 +145,11 @@ struct CallSpec {
 @available(iOS 26.0, *)
 struct CallMetadata: AlarmMetadata {}
 
-/// "Reddet": uygulamayı açmadan dozu erteler; erteleme alarmını burada kurar,
+/// "Ertele": uygulamayı açmadan dozu erteler; erteleme alarmını burada kurar,
 /// Dart'a da kaydeder ki plan yenilenince erteleme korunsun.
 @available(iOS 26.0, *)
 struct DeclineCallIntent: LiveActivityIntent {
-  static let title: LocalizedStringResource = "Reddet"
+  static let title: LocalizedStringResource = "Ertele"
   static let isDiscoverable = false
 
   @Parameter(title: "Doz") var payload: String
@@ -186,10 +186,10 @@ struct DeclineCallIntent: LiveActivityIntent {
   }
 }
 
-/// "Kabul et": uygulamayı Bugün ekranında açar; doz orada işaretlenir.
+/// "Aç": uygulamayı Bugün ekranında açar; doz orada işaretlenir.
 @available(iOS 26.0, *)
 struct AnswerCallIntent: LiveActivityIntent {
-  static let title: LocalizedStringResource = "Kabul et"
+  static let title: LocalizedStringResource = "Aç"
   static let isDiscoverable = false
   static let openAppWhenRun = true
 

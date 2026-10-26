@@ -24,6 +24,18 @@ const formLabels = {
   'other': 'Diğer',
 };
 
+/// Form seçicideki dar kutucuklar için kısa adlar.
+const formShortLabels = {
+  'pill': 'Tablet',
+  'capsule': 'Kapsül',
+  'syrup': 'Şurup',
+  'drops': 'Damla',
+  'injection': 'İğne',
+  'cream': 'Krem',
+  'inhaler': 'Solunum',
+  'other': 'Diğer',
+};
+
 const anchorLabels = {
   TimingAnchor.fixed: 'Belirli saat',
   TimingAnchor.wake: 'Uyanınca',

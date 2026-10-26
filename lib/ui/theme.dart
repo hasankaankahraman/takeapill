@@ -280,16 +280,5 @@ ThemeData buildTheme(Brightness brightness) {
       headerForegroundColor: c.ink,
       dividerColor: c.line,
     ),
-    timePickerTheme: TimePickerThemeData(
-      backgroundColor: c.surface,
-      elevation: 0,
-      dialBackgroundColor: c.chip,
-      hourMinuteColor: WidgetStateColor.resolveWith(
-        (s) => s.contains(WidgetState.selected) ? c.primary : c.chip,
-      ),
-      hourMinuteTextColor: WidgetStateColor.resolveWith(
-        (s) => s.contains(WidgetState.selected) ? c.onPrimary : c.ink,
-      ),
-    ),
   );
 }

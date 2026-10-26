@@ -88,3 +88,25 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
   ThemeModeNotifier.new,
 );
+
+/// Açılışta DB'den okunan ad; Bugün başlığı ilk karede doğru çıksın.
+final initialUserNameProvider = Provider<String?>((_) => null);
+
+/// Kullanıcının adı (selamlama ve bildirimlerde); girilmediyse null.
+class UserNameNotifier extends Notifier<String?> {
+  @override
+  String? build() => ref.read(initialUserNameProvider);
+
+  Future<void> set(String name) async {
+    final db = ref.read(dbProvider);
+    final clean = await db.saveUserName(name);
+    if (clean == state) return;
+    state = clean;
+    // Bekleyen bildirimler yeni adla yeniden kurulsun.
+    await trySyncNotifications(db);
+  }
+}
+
+final userNameProvider = NotifierProvider<UserNameNotifier, String?>(
+  UserNameNotifier.new,
+);

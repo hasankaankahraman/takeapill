@@ -1,1 +1,1 @@
-unutma,hatırlatma,takip,vakti,zamanı,doz,doğum,kontrol,antibiyotik,tansiyon,takviye,ilacımı
+unutma,hatırlatma,takip,vakti,zamanı,doz,doğum,kontrol,antibiyotik,tansiyon,takviye,vitamin,alarm

@@ -35,18 +35,18 @@ lib/
   gönderilmeden önce nedeni bir pencereyle anlatılır.
 - "Ertele" kalıcıdır: Settings tablosunda saklanır, plan yenilense de korunur.
 - Hatırlatma şekli (onboarding'de seçilir, Ayarlar'dan değişir): bildirim ya
-  da arama. Arama modunda doz saati ve erteleme hatırlatması "Reddet /
-  Kabul et" ile çalar: Reddet ertelenir, Kabul et uygulamayı Bugün ekranında
-  açar (doz orada işaretlenir).
+  da alarm. Alarm modunda doz saati ve erteleme hatırlatması "Ertele / Aç"
+  butonlu alarm olarak çalar: Ertele dozu erteler, Aç uygulamayı Bugün
+  ekranında açar (doz orada işaretlenir).
   - iOS 26+ (alarm izni varsa): AlarmKit alarmı (`ios/Runner/CallAlarms.swift`);
     Dynamic Island'da ve kilit ekranında çıkar, sessiz modu ve Odak'ı aşar.
-    Reddet uygulamayı açmadan erteleme alarmı kurar. Butonlar UserDefaults'a
+    Ertele uygulamayı açmadan erteleme alarmı kurar. Butonlar UserDefaults'a
     yazılır, Dart açılışta, öne gelince ve her bildirim butonundan önce işler
     (`applyAlarmActions`). Alarm başlığında yemek notu da yer alır.
-  - Android: telefonun zil sesi alarm akışında çalar (`call_alarms` kanalı),
+  - Android: telefonun alarm sesi alarm akışında çalar (`dose_alarms` kanalı),
     böylece sessiz/titreşim modunda da duyulur; 60 sn sonra susar. Tam ekran
-    arama yok (`USE_FULL_SCREEN_INTENT` Play politikası gereği kaldırıldı).
-  - Daha eski iOS ya da izin yoksa: `ios/Runner/ring.caf` sesli bildirim;
+    alarm yok (`USE_FULL_SCREEN_INTENT` Play politikası gereği kaldırıldı).
+  - Daha eski iOS ya da izin yoksa: `ios/Runner/alarm.caf` sesli bildirim;
     sessiz modda yalnızca titrer.
 
 ## Geliştirme

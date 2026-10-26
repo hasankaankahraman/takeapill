@@ -150,7 +150,7 @@ class _MedTile extends StatelessWidget {
       onTap: () => context.push('/med?id=${m.id}'),
       child: Row(
         children: [
-          MedBadge(color: m.color, size: 48),
+          MedBadge(color: m.color, form: m.form, size: 48),
           const SizedBox(width: 14),
           Expanded(
             child: Column(

@@ -29,7 +29,10 @@ class TodayScreen extends ConsumerWidget {
           children: [
             PageHeader(
               eyebrow: DateFormat('d MMMM, EEEE', 'tr').format(now),
-              title: 'Bugün',
+              title: switch (ref.watch(userNameProvider)) {
+                final name? => '${_greeting(now)}, $name',
+                null => 'Bugün',
+              },
               trailing: AddButton(onPressed: () => context.push('/med')),
             ),
             if (ref.watch(notificationsEnabledProvider).value == false)
@@ -104,6 +107,12 @@ class _NotificationsOff extends StatelessWidget {
     );
   }
 }
+
+String _greeting(DateTime d) => switch (d.hour) {
+  >= 5 && < 11 => 'Günaydın',
+  >= 11 && < 18 => 'Merhaba',
+  _ => 'İyi akşamlar',
+};
 
 String _dayPart(DateTime d) => switch (d.hour) {
   < 12 => 'Sabah',
@@ -276,7 +285,7 @@ class _DoseCard extends ConsumerWidget {
 
     final info = Row(
       children: [
-        MedBadge(color: med.color),
+        MedBadge(color: med.color, form: med.form),
         const SizedBox(width: 12),
         Expanded(
           child: Column(

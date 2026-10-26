@@ -13,6 +13,7 @@ import '../core/notifications/notification_service.dart';
 import '../features/schedule/domain/rule_codec.dart';
 import '../features/schedule/domain/schedule_models.dart';
 import 'form_rows.dart';
+import 'med_icons.dart';
 import 'providers.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -63,10 +64,37 @@ const _units = [
   'ölçek',
 ];
 
+/// Sihirbazın adımları: başlık, açıklama ve adım çubuğundaki kısa ad.
+const _steps = [
+  ('İlaç', 'Hangi ilaç?', 'Adını yaz ve formunu seç.'),
+  (
+    'Doz',
+    'Ne kadar?',
+    'Dozu ve ne için kullandığını gir; ilacın bu renkle görünür.',
+  ),
+  (
+    'Zamanlama',
+    'Ne zaman?',
+    'Belirli saatler, yemek zamanları ya da saat aralığıyla planla.',
+  ),
+  (
+    'Süre',
+    'Ne kadar süre?',
+    'Kür ise bitiş tarihi ekle; doktorunun talimatını da not edebilirsin.',
+  ),
+];
+
 class MedicationFormScreen extends ConsumerStatefulWidget {
-  const MedicationFormScreen({super.key, this.medicationId});
+  const MedicationFormScreen({
+    super.key,
+    this.medicationId,
+    this.initialStep = 0,
+  });
 
   final int? medicationId;
+
+  /// Açılıştaki adım; düzenlerken doğrudan bir adıma gitmek için.
+  final int initialStep;
 
   @override
   ConsumerState<MedicationFormScreen> createState() => _FormState();
@@ -93,8 +121,14 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
   DateTime _start = _today();
   DateTime? _end;
 
+  late int _step = widget.initialStep.clamp(0, _steps.length - 1);
+  late final _pages = PageController(initialPage: _step);
+
   bool _loading = true;
   bool _saving = false;
+
+  bool get _editing => widget.medicationId != null;
+  bool get _last => _step == _steps.length - 1;
 
   static DateTime _today() {
     final n = clock.now();
@@ -167,6 +201,7 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
     _amount.dispose();
     _purpose.dispose();
     _notes.dispose();
+    _pages.dispose();
     super.dispose();
   }
 
@@ -192,33 +227,58 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
     ),
   };
 
+  /// Adımın alanları geçerliyse true; değilse hatayı gösterir.
+  bool _check(int step) {
+    switch (step) {
+      case 0 when _name.text.trim().isEmpty:
+        setState(() => _nameMissing = true);
+        return false;
+      case 2 when _kind == _Kind.daily && _weekdays.isEmpty:
+        _snack('En az bir gün seç.');
+        return false;
+      case 2 when _kind == _Kind.daily && _slots.isEmpty:
+        _snack('En az bir doz saati ekle.');
+        return false;
+      case 3 when _end != null && _end!.isBefore(_start):
+        _snack('Bitiş tarihi başlangıçtan önce olamaz.');
+        return false;
+    }
+    return true;
+  }
+
+  void _go(int step) {
+    FocusScope.of(context).unfocus();
+    setState(() => _step = step);
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _pages.jumpToPage(step);
+    } else {
+      _pages.animateToPage(
+        step,
+        duration: const Duration(milliseconds: 380),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  void _next() {
+    if (!_check(_step)) return;
+    _last ? _save() : _go(_step + 1);
+  }
+
   Future<void> _save() async {
-    if (_name.text.trim().isEmpty) {
-      setState(() => _nameMissing = true);
-      return;
-    }
-    if (_kind == _Kind.daily && _weekdays.isEmpty) {
-      _snack('En az bir gün seç.');
-      return;
-    }
-    if (_kind == _Kind.daily && _slots.isEmpty) {
-      _snack('En az bir doz saati ekle.');
-      return;
-    }
-    if (_end != null && _end!.isBefore(_start)) {
-      _snack('Bitiş tarihi başlangıçtan önce olamaz.');
-      return;
+    // Düzenlerken her adımdan kaydedilebilir; hatalı adıma geri dönülür.
+    for (var i = 0; i < _steps.length; i++) {
+      if (!_check(i)) {
+        if (i != _step) _go(i);
+        return;
+      }
     }
     setState(() => _saving = true);
     final db = ref.read(dbProvider);
     final med = MedicationsCompanion(
       name: Value(_name.text.trim()),
       form: Value(_form),
-      strength: Value(
-        _amount.text.trim().isEmpty
-            ? ''
-            : '${_amount.text.trim()} $_unit'.trim(),
-      ),
+      strength: Value(_strength),
       purpose: Value(_purpose.text.trim()),
       notes: Value(_notes.text.trim()),
       color: Value(_color),
@@ -243,6 +303,9 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
     if (mounted) context.pop();
   }
 
+  String get _strength =>
+      _amount.text.trim().isEmpty ? '' : '${_amount.text.trim()} $_unit'.trim();
+
   void _snack(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
@@ -253,178 +316,358 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
     }
     final c = context.c;
     final apple = isApple(context);
-    final title = widget.medicationId == null ? 'Yeni ilaç' : 'İlacı düzenle';
+    final title = _editing ? 'İlacı düzenle' : 'Yeni ilaç';
     final side = math.max(20.0, (MediaQuery.sizeOf(context).width - 640) / 2);
-    return Scaffold(
-      appBar: AppBar(
-        // iOS sayfası kendi üst boşluğunu bırakır.
-        primary: !apple,
-        leadingWidth: apple ? 96 : null,
-        leading: apple
-            ? CupertinoButton(
-                padding: const EdgeInsets.only(left: 16),
-                onPressed: () => context.pop(),
+    return PopScope(
+      // Geri hareketi önceki adıma döner; ilk adımda formu kapatır.
+      canPop: _step == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _go(_step - 1);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          // iOS sayfası kendi üst boşluğunu bırakır.
+          primary: !apple,
+          leadingWidth: apple ? 96 : null,
+          leading: apple
+              ? CupertinoButton(
+                  padding: const EdgeInsets.only(left: 16),
+                  onPressed: () => context.pop(),
+                  child: Text(
+                    'Vazgeç',
+                    style: TextStyle(fontFamily: fontFamily, color: c.accent),
+                  ),
+                )
+              : IconButton(
+                  tooltip: 'Kapat',
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () => context.pop(),
+                ),
+          title: Text(title),
+          actions: [
+            // Yeni ilaç son adımda kaydedilir; düzenlerken her adımda.
+            if (_editing && apple)
+              CupertinoButton(
+                padding: const EdgeInsets.only(right: 16),
+                onPressed: _saving ? null : _save,
                 child: Text(
-                  'Vazgeç',
-                  style: TextStyle(fontFamily: fontFamily, color: c.accent),
+                  'Kaydet',
+                  style: TextStyle(
+                    fontFamily: fontFamily,
+                    color: c.accent,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               )
-            : IconButton(
-                tooltip: 'Kapat',
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () => context.pop(),
-              ),
-        title: Text(title),
-        actions: [
-          if (apple)
-            CupertinoButton(
-              padding: const EdgeInsets.only(right: 16),
-              onPressed: _saving ? null : _save,
-              child: Text(
-                'Kaydet',
-                style: TextStyle(
-                  fontFamily: fontFamily,
-                  color: c.accent,
-                  fontWeight: FontWeight.w700,
+            else if (_editing) ...[
+              TextButton(
+                onPressed: _saving ? null : _save,
+                child: const Text(
+                  'Kaydet',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
-            )
-          else ...[
-            TextButton(
-              onPressed: _saving ? null : _save,
-              child: const Text(
-                'Kaydet',
-                style: TextStyle(fontWeight: FontWeight.w700),
+              const SizedBox(width: 8),
+            ],
+          ],
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(side, 4, side, 0),
+              child: _StepBar(
+                step: _step,
+                labels: [for (final s in _steps) s.$1],
+                // Yeni ilaçta ileri atlanmaz; adımlar sırayla doğrulanır.
+                canOpen: (i) => _editing || i < _step,
+                onOpen: _go,
               ),
             ),
-            const SizedBox(width: 8),
+            Expanded(
+              child: PageView(
+                controller: _pages,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _page(0, side, _nameStep()),
+                  _page(1, side, _doseStep()),
+                  _page(2, side, _scheduleStep()),
+                  _page(3, side, _durationStep()),
+                ],
+              ),
+            ),
+            _bottomBar(side),
           ],
-        ],
-      ),
-      body: ListView(
-        // Tablette form ortada dar bir sütun olarak kalır.
-        padding: EdgeInsets.fromLTRB(
-          side,
-          0,
-          side,
-          32 + MediaQuery.paddingOf(context).bottom,
         ),
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        children: [
-          FormSection(
-            footer: _nameMissing
-                ? const FormNote('İlaç adı gerekli', error: true)
-                : null,
-            children: [
-              FieldRow(
-                key: const ValueKey('name'),
-                controller: _name,
-                placeholder: 'İlaç adı',
-                textCapitalization: TextCapitalization.words,
-                // Medications.name sütununun sınırı.
-                maxLength: 120,
-                onChanged: (_) {
-                  if (_nameMissing) setState(() => _nameMissing = false);
-                },
-              ),
-              FieldRow(
-                key: const ValueKey('amount'),
-                controller: _amount,
-                label: 'Doz',
-                placeholder: '500',
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                trailing: MenuButton<String>(
-                  value: _unit,
-                  options: {
-                    for (final u in {..._units, _unit}) u: u.isEmpty ? '—' : u,
-                  },
-                  onChanged: (u) => setState(() => _unit = u),
-                ),
-              ),
-              FieldRow(
-                key: const ValueKey('purpose'),
-                controller: _purpose,
-                label: 'Ne için',
-                placeholder: 'Tansiyon, takviye…',
-              ),
-              FieldRow(
-                key: const ValueKey('notes'),
-                controller: _notes,
-                placeholder: 'Notlar: doktor talimatı, uyarılar…',
-                maxLines: 4,
-              ),
-            ],
-          ),
-          FormSection(
-            header: 'Görünüm',
-            children: [
-              MenuRow<String>(
-                title: 'Form',
-                value: _form,
-                options: {
-                  ...formLabels,
-                  if (!formLabels.containsKey(_form)) _form: _form,
-                },
-                onChanged: (v) => setState(() => _form = v),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [for (final col in _palette) _swatch(col)],
-                ),
-              ),
-            ],
-          ),
-          const SectionLabel('Zamanlama'),
-          Segmented<_Kind>(
-            options: const {
-              _Kind.daily: 'Günlük',
-              _Kind.interval: 'Her X saat',
-              _Kind.asNeeded: 'Gerekirse',
-            },
-            selected: _kind,
-            onChanged: (k) => setState(() => _kind = k),
-          ),
-          ...switch (_kind) {
-            _Kind.daily => _dailySection(),
-            _Kind.interval => _intervalSection(),
-            _Kind.asNeeded => _asNeededSection(),
-          },
-          FormSection(
-            header: 'Süre',
-            footer: _end == null
-                ? const FormNote('Bitiş tarihi yoksa süresiz devam eder.')
-                : null,
-            children: [
-              DateRow(
-                title: 'Başlangıç',
-                date: _start,
-                onChanged: (d) => setState(() => _start = d),
-              ),
-              SwitchRow(
-                title: 'Bitiş tarihi (kür)',
-                value: _end != null,
-                onChanged: (on) => setState(
-                  () => _end = on ? _start.add(const Duration(days: 7)) : null,
-                ),
-              ),
-              if (_end case final end?)
-                DateRow(
-                  title: 'Bitiş',
-                  date: end,
-                  onChanged: (d) => setState(() => _end = d),
-                ),
-            ],
-          ),
-        ],
       ),
     );
+  }
+
+  Widget _page(int i, double side, List<Widget> children) {
+    final (_, heading, text) = _steps[i];
+    return ListView(
+      // Tablette form ortada dar bir sütun olarak kalır.
+      padding: EdgeInsets.fromLTRB(side, 24, side, 24),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            heading,
+            style: const TextStyle(
+              fontSize: 28,
+              height: 1.15,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.7,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          text,
+          style: TextStyle(fontSize: 15, height: 1.35, color: context.c.muted),
+        ),
+        ...children,
+      ],
+    );
+  }
+
+  Widget _bottomBar(double side) {
+    final c = context.c;
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(side, 8, side, 0),
+        child: Row(
+          children: [
+            if (_step > 0) ...[
+              IconButton(
+                tooltip: 'Geri',
+                style: IconButton.styleFrom(
+                  fixedSize: const Size(56, 56),
+                  backgroundColor: c.surface,
+                  foregroundColor: c.ink,
+                  side: BorderSide(color: c.line),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: () => _go(_step - 1),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(56),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                onPressed: _saving ? null : _next,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: _last
+                      ? const Text('Kaydet', key: ValueKey('save'))
+                      : const Row(
+                          key: ValueKey('next'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('Devam'),
+                            SizedBox(width: 8),
+                            Icon(Icons.arrow_forward_rounded, size: 20),
+                          ],
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- 1. İlaç ---------------------------------------------------------------
+
+  List<Widget> _nameStep() => [
+    FormSection(
+      footer: _nameMissing
+          ? const FormNote('İlaç adı gerekli', error: true)
+          : null,
+      children: [
+        FieldRow(
+          key: const ValueKey('name'),
+          controller: _name,
+          placeholder: 'İlaç adı',
+          textCapitalization: TextCapitalization.words,
+          autofocus: !_editing,
+          // Medications.name sütununun sınırı.
+          maxLength: 120,
+          onChanged: (_) {
+            if (_nameMissing) setState(() => _nameMissing = false);
+          },
+        ),
+      ],
+    ),
+    const SectionLabel('Form'),
+    LayoutBuilder(
+      builder: (context, box) {
+        const gap = 10.0;
+        final w = (box.maxWidth - gap * 3) / 4;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [for (final f in formLabels.keys) _formTile(f, w)],
+        );
+      },
+    ),
+  ];
+
+  Widget _formTile(String form, double width) {
+    final c = context.c;
+    final selected = _form == form;
+    final (bg, fg) = medTint(context, _color);
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(18),
+      side: selected
+          ? BorderSide(color: fg, width: 2)
+          : BorderSide(color: c.line),
+    );
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: formLabels[form],
+      child: ExcludeSemantics(
+        child: Material(
+          color: c.surface,
+          shape: shape,
+          child: InkWell(
+            customBorder: shape,
+            onTap: () => setState(() => _form = form),
+            child: SizedBox(
+              width: width,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Column(
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 46,
+                      height: 46,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: selected ? bg : c.chip,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: MedFormIcon(
+                        form: form,
+                        color: selected ? fg : c.muted,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      formShortLabels[form] ?? form,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: selected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: selected ? c.ink : c.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- 2. Doz ----------------------------------------------------------------
+
+  List<Widget> _doseStep() {
+    final c = context.c;
+    final name = _name.text.trim();
+    return [
+      const SizedBox(height: 20),
+      // Seçimlerin listede nasıl görüneceğinin önizlemesi.
+      Panel(
+        child: Row(
+          children: [
+            MedBadge(color: _color, form: _form, size: 52),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name.isEmpty ? 'İlaç adı' : name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      formLabels[_form] ?? _form,
+                      if (_strength.isNotEmpty) _strength,
+                    ].join(' · '),
+                    style: TextStyle(fontSize: 14, color: c.muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      FormSection(
+        header: 'Doz',
+        children: [
+          FieldRow(
+            key: const ValueKey('amount'),
+            controller: _amount,
+            label: 'Miktar',
+            placeholder: '500',
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => setState(() {}),
+            trailing: MenuButton<String>(
+              value: _unit,
+              options: {
+                for (final u in {..._units, _unit}) u: u.isEmpty ? '—' : u,
+              },
+              onChanged: (u) => setState(() => _unit = u),
+            ),
+          ),
+          FieldRow(
+            key: const ValueKey('purpose'),
+            controller: _purpose,
+            label: 'Ne için',
+            placeholder: 'Tansiyon, takviye…',
+          ),
+        ],
+      ),
+      FormSection(
+        header: 'Renk',
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [for (final col in _palette) _swatch(col)],
+            ),
+          ),
+        ],
+      ),
+    ];
   }
 
   Widget _swatch(int col) => Semantics(
@@ -451,6 +694,68 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
       ),
     ),
   );
+
+  // --- 3. Zamanlama ----------------------------------------------------------
+
+  List<Widget> _scheduleStep() => [
+    const SizedBox(height: 20),
+    Segmented<_Kind>(
+      options: const {
+        _Kind.daily: 'Günlük',
+        _Kind.interval: 'Her X saat',
+        _Kind.asNeeded: 'Gerekirse',
+      },
+      selected: _kind,
+      onChanged: (k) => setState(() => _kind = k),
+    ),
+    ...switch (_kind) {
+      _Kind.daily => _dailySection(),
+      _Kind.interval => _intervalSection(),
+      _Kind.asNeeded => _asNeededSection(),
+    },
+  ];
+
+  // --- 4. Süre ---------------------------------------------------------------
+
+  List<Widget> _durationStep() => [
+    FormSection(
+      header: 'Süre',
+      footer: _end == null
+          ? const FormNote('Bitiş tarihi yoksa süresiz devam eder.')
+          : null,
+      children: [
+        DateRow(
+          title: 'Başlangıç',
+          date: _start,
+          onChanged: (d) => setState(() => _start = d),
+        ),
+        SwitchRow(
+          title: 'Bitiş tarihi (kür)',
+          value: _end != null,
+          onChanged: (on) => setState(
+            () => _end = on ? _start.add(const Duration(days: 7)) : null,
+          ),
+        ),
+        if (_end case final end?)
+          DateRow(
+            title: 'Bitiş',
+            date: end,
+            onChanged: (d) => setState(() => _end = d),
+          ),
+      ],
+    ),
+    FormSection(
+      header: 'Notlar',
+      children: [
+        FieldRow(
+          key: const ValueKey('notes'),
+          controller: _notes,
+          placeholder: 'Doktor talimatı, uyarılar…',
+          maxLines: 4,
+        ),
+      ],
+    ),
+  ];
 
   static const _offsets = [-60, -30, -15, 0, 15, 30, 60, 90];
 
@@ -611,4 +916,79 @@ class _FormState extends ConsumerState<MedicationFormScreen> {
       ],
     ),
   ];
+}
+
+/// Formun üstündeki adım çubuğu: her adım bir şerit ve kısa ad. Geçilen
+/// adımlara (düzenlerken hepsine) dokunulunca o adıma dönülür.
+class _StepBar extends StatelessWidget {
+  const _StepBar({
+    required this.step,
+    required this.labels,
+    required this.canOpen,
+    required this.onOpen,
+  });
+
+  final int step;
+  final List<String> labels;
+  final bool Function(int) canOpen;
+  final ValueChanged<int> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.c;
+    return Row(
+      children: [
+        for (var i = 0; i < labels.length; i++) ...[
+          if (i > 0) const SizedBox(width: 6),
+          Expanded(
+            child: Semantics(
+              button: canOpen(i),
+              selected: i == step,
+              label: 'Adım ${i + 1} / ${labels.length}: ${labels[i]}',
+              child: ExcludeSemantics(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: canOpen(i) && i != step ? () => onOpen(i) : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutCubic,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: i <= step ? c.accent : c.line,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          labels[i],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: i == step
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: i == step
+                                ? c.ink
+                                : i < step
+                                ? c.muted
+                                : c.muted.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }

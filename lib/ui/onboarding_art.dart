@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
+import 'widgets.dart' show upperTr;
 
 /// Karşılama sayfalarının vurgu renkleri; zemin ve görseller bunu paylaşır.
 List<Color> onboardingTints(BuildContext context) {
@@ -12,6 +13,7 @@ List<Color> onboardingTints(BuildContext context) {
     c.accent,
     dark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7),
     c.ok,
+    dark ? const Color(0xFFF472B6) : const Color(0xFFDB2777),
     dark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED),
     c.accent,
   ];
@@ -21,10 +23,18 @@ List<Color> onboardingTints(BuildContext context) {
 /// yerine oturur, sonra sahne hafifçe nefes alır. "Hareketi azalt" açıksa
 /// son hâli sabit gösterilir.
 class OnboardingArt extends StatefulWidget {
-  const OnboardingArt({super.key, required this.page, required this.active});
+  const OnboardingArt({
+    super.key,
+    required this.page,
+    required this.active,
+    this.name,
+  });
 
   final int page;
   final bool active;
+
+  /// Ad sayfasında yazıldıkça selamlama ve bildirim önizlemesine yansır.
+  final String? name;
 
   @override
   State<OnboardingArt> createState() => _OnboardingArtState();
@@ -96,7 +106,8 @@ class _OnboardingArtState extends State<OnboardingArt>
                         0 => _PillScene(k: k, tint: tint),
                         1 => _ReminderScene(k: k, tint: tint),
                         2 => _ProgressScene(k: k, tint: tint),
-                        3 => _CallScene(k: k, tint: tint),
+                        3 => _NameScene(k: k, tint: tint, name: widget.name),
+                        4 => _AlarmScene(k: k, tint: tint),
                         _ => _PrivacyScene(k: k, tint: tint),
                       },
                     ],
@@ -917,10 +928,101 @@ class _RingPainter extends CustomPainter {
       old.value != value || old.color != color || old.track != track;
 }
 
-// --- 4. Arama ---------------------------------------------------------------
+// --- 4. Ad ------------------------------------------------------------------
 
-class _CallScene extends StatelessWidget {
-  const _CallScene({required this.k, required this.tint});
+/// Baş harfli avatar, selamlama ve adla gelen bildirimin önizlemesi.
+class _NameScene extends StatelessWidget {
+  const _NameScene({required this.k, required this.tint, this.name});
+
+  final _Clock k;
+  final Color tint;
+  final String? name;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = this.name;
+    final bob = 3 * k.wave(0.25);
+    return Stack(
+      alignment: Alignment.topCenter,
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          top: bob,
+          child: _Pop(
+            t: k.at(0.0, 0.5, Curves.easeOutBack),
+            child: Container(
+              width: 76,
+              height: 76,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [_lighten(tint, 0.25), _darken(tint, 0.15)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: tint.withValues(alpha: 0.4),
+                    blurRadius: 22,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: name == null
+                  ? const Icon(
+                      Icons.person_rounded,
+                      color: Colors.white,
+                      size: 38,
+                    )
+                  : Text(
+                      upperTr(name.characters.first),
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 92 + bob,
+          child: _Pop(
+            t: k.at(0.25, 0.7, Curves.easeOutBack),
+            child: _GlassChip(
+              icon: Icons.waving_hand_rounded,
+              text: name == null ? 'Merhaba!' : 'Merhaba, $name',
+              tint: tint,
+            ),
+          ),
+        ),
+        Positioned(
+          top: 150 + bob,
+          child: _Pop(
+            t: k.at(0.45, 0.95),
+            child: _NotifCard(
+              title: name == null
+                  ? 'İlaç zamanı: D vitamini'
+                  : '$name, ilaç vaktin geldi',
+              body: [
+                if (name != null) 'D vitamini',
+                '08:00 · Kahvaltıyla',
+              ].join(' · '),
+              time: 'şimdi',
+              tint: tint,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// --- 5. Alarm --------------------------------------------------------------
+
+class _AlarmScene extends StatelessWidget {
+  const _AlarmScene({required this.k, required this.tint});
 
   final _Clock k;
   final Color tint;
@@ -928,7 +1030,7 @@ class _CallScene extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.c;
-    // Her turda üç kez çalar: halkalar yayılır, simge kısa bir süre titrer.
+    // Her turda üç kez çalar: halkalar yayılır, saat kısa bir süre titrer.
     final beat = (k.idle * 3) % 1;
     final shake = beat < 0.25 ? math.sin(beat * 16 * math.pi) * 0.12 : 0.0;
     return Stack(
@@ -940,8 +1042,8 @@ class _CallScene extends StatelessWidget {
           child: _Pop(
             t: k.at(0.35, 0.7, Curves.easeOutBack),
             child: _GlassChip(
-              icon: Icons.call_rounded,
-              text: 'Take a Pill arıyor…',
+              icon: Icons.alarm_rounded,
+              text: 'İlaç zamanı · 08:00',
               tint: tint,
             ),
           ),
@@ -996,7 +1098,7 @@ class _CallScene extends StatelessWidget {
                         ],
                       ),
                       child: const Icon(
-                        Icons.medication_rounded,
+                        Icons.alarm_rounded,
                         color: Colors.white,
                         size: 46,
                       ),
@@ -1008,29 +1110,45 @@ class _CallScene extends StatelessWidget {
           ),
         ),
         Positioned(
-          top: 236,
+          top: 242,
           child: Row(
             children: [
-              for (final (i, (icon, color)) in [
-                (Icons.call_end_rounded, const Color(0xFFEF4444)),
-                (Icons.call_rounded, const Color(0xFF22C55E)),
+              for (final (i, (icon, label, color)) in [
+                (Icons.snooze_rounded, 'Ertele', c.muted),
+                (Icons.medication_rounded, 'Aç', tint),
               ].indexed) ...[
-                if (i > 0) const SizedBox(width: 92),
+                if (i > 0) const SizedBox(width: 14),
                 Transform.translate(
-                  // Yeşil düğme "aç beni" der gibi hafifçe zıplar.
+                  // "Aç" düğmesi dokun der gibi hafifçe zıplar.
                   offset: Offset(0, i == 1 ? -3 * (k.wave(0, 3) + 1) / 2 : 0),
                   child: _Pop(
                     t: k.at(0.5 + 0.1 * i, 0.85 + 0.1 * i, Curves.easeOutBack),
                     child: Container(
-                      width: 56,
-                      height: 56,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 22,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(23),
                         color: color,
                         border: Border.all(color: c.surface, width: 3),
                         boxShadow: _softShadow(context),
                       ),
-                      child: Icon(icon, color: Colors.white, size: 26),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(icon, color: Colors.white, size: 20),
+                          const SizedBox(width: 6),
+                          Text(
+                            label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1043,7 +1161,7 @@ class _CallScene extends StatelessWidget {
   }
 }
 
-// --- 5. Gizlilik ------------------------------------------------------------
+// --- 6. Gizlilik ------------------------------------------------------------
 
 class _PrivacyScene extends StatelessWidget {
   const _PrivacyScene({required this.k, required this.tint});

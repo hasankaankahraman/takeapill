@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,18 +33,35 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
   /// İzin sistem ayarlarından açılıp dönülürse uyarı kalksın.
   late final AppLifecycleListener _lifecycle;
 
+  late final _name = TextEditingController(text: ref.read(userNameProvider));
+
+  /// Ad her tuşta değil, yazma durunca kaydedilir (bildirimler yeniden
+  /// kurulur).
+  Timer? _nameSave;
+
+  /// dispose'da bekleyen kayıt için; orada ref kullanılamaz.
+  late final UserNameNotifier _userName;
+
   @override
   void initState() {
     super.initState();
     _lifecycle = AppLifecycleListener(onResume: _refreshPermissions);
+    _userName = ref.read(userNameProvider.notifier);
     _load();
   }
 
   @override
   void dispose() {
     _lifecycle.dispose();
+    if (_nameSave?.isActive ?? false) {
+      _nameSave!.cancel();
+      _saveName();
+    }
+    _name.dispose();
     super.dispose();
   }
+
+  void _saveName() => _userName.set(_name.text);
 
   Future<void> _refreshPermissions() async {
     final exact = await NotificationService.exactAlarmsAllowed();
@@ -59,7 +78,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
       _alarmState = alarm;
       _notificationsOn = on;
     });
-    // Alarm izni sistem ayarlarından açıldıysa aramalar alarma geçsin.
+    // Alarm izni sistem ayarlarından açıldıysa alarmlar AlarmKit'e geçsin.
     await trySyncNotifications(ref.read(dbProvider));
   }
 
@@ -138,9 +157,41 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SectionLabel(
-                'Görünüm',
+                'Profil',
                 padding: EdgeInsets.fromLTRB(4, 0, 4, 10),
               ),
+              GroupPanel(
+                children: [
+                  FieldRow(
+                    key: const ValueKey('userName'),
+                    controller: _name,
+                    label: 'Adın',
+                    placeholder: 'İsteğe bağlı',
+                    textCapitalization: TextCapitalization.words,
+                    maxLength: userNameMaxLength,
+                    textInputAction: TextInputAction.done,
+                    onChanged: (_) {
+                      _nameSave?.cancel();
+                      _nameSave = Timer(
+                        const Duration(milliseconds: 700),
+                        _saveName,
+                      );
+                    },
+                    onSubmitted: (_) {
+                      _nameSave?.cancel();
+                      _saveName();
+                    },
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                child: Text(
+                  'Ana sayfada ve bildirimlerde sana adınla seslenilir.',
+                  style: TextStyle(fontSize: 12, color: c.muted),
+                ),
+              ),
+              const SectionLabel('Görünüm'),
               Segmented<ThemeMode>(
                 options: const {
                   ThemeMode.system: 'Sistem',
@@ -177,7 +228,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                   MenuRow<bool>(
                     title: 'Hatırlatma şekli',
                     value: p.callMode,
-                    options: const {false: 'Bildirim', true: 'Arama'},
+                    options: const {false: 'Bildirim', true: 'Alarm'},
                     onChanged: (v) async {
                       // Önce izin: plan, izne göre alarm ya da bildirimle kurulur.
                       if (v) await NotificationService.requestCallPermission();
@@ -269,8 +320,8 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
                   child: Text(
                     [
-                      'İlaç saatinde telefonun arama gibi çalar. Kabul edersen '
-                          'uygulama açılır, reddedersen ertelenir.',
+                      'İlaç saatinde alarm çalar. "Aç" dersen uygulama açılır, '
+                          '"Ertele" dersen alarm sonra yeniden çalar.',
                       // iOS'taki sınırlar aşağıda, alarm iznine göre yazılır.
                       if (!isApple(context))
                         'Telefon sessizdeyken de alarm sesiyle çalar; bir '
@@ -283,7 +334,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
                   child: Text(
-                    'Alarm izni kapalı; arama Dynamic Island yerine bildirim '
+                    'Alarm izni kapalı; alarm kilit ekranı yerine bildirim '
                     'olarak gelir ve sessiz modda çalmaz. Açmak için: iPhone '
                     'Ayarları › Take a Pill › Alarmlar.',
                     style: TextStyle(fontSize: 12, color: c.warn),
@@ -293,8 +344,8 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
                   child: Text(
-                    'Dynamic Island\'da arama için iOS 26 gerekir; bu cihazda '
-                    'arama, zil sesli bildirim olarak gelir ve sessiz modda '
+                    'Kilit ekranında alarm için iOS 26 gerekir; bu cihazda '
+                    'alarm, sesli bildirim olarak gelir ve sessiz modda '
                     'çalmaz.',
                     style: TextStyle(fontSize: 12, color: c.muted),
                   ),

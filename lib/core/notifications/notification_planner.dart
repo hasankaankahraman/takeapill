@@ -17,7 +17,7 @@ class NotificationPrefs {
   final int nagMinutes;
   final int snoozeMinutes;
 
-  /// Doz saati (ve erteleme sonrası) bildirim yerine gelen arama gibi çalar.
+  /// Doz saati (ve erteleme sonrası) bildirim yerine alarm olarak çalar.
   final bool callMode;
 
   NotificationPrefs copyWith({int? lead, int? nag, int? snooze, bool? call}) =>
@@ -52,7 +52,7 @@ class PlannedNotification {
   final DateTime doseAt;
   final FoodRelation food;
 
-  /// Arama olarak çalar (bkz. [NotificationPrefs.callMode]).
+  /// Alarm olarak çalar (bkz. [NotificationPrefs.callMode]).
   final bool call;
 
   String get payload => encodePayload(medicationId, doseAt, call: call);

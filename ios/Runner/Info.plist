@@ -33,7 +33,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAlarmKitUsageDescription</key>
-	<string>İlaç saatinde telefonun arama gibi çalması ve Dynamic Island'da “Kabul et / Reddet” göstermesi için.</string>
+	<string>İlaç saatinde, telefon sessizdeyken de kilit ekranında ve Dynamic Island'da alarm çalabilmek için.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

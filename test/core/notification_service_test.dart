@@ -63,25 +63,48 @@ void main() {
     );
   });
 
-  test('arama modunda doz saati alarm sesli arama kanalında çalar', () async {
+  test('ad girildiyse bildirimler kişiye seslenir', () async {
+    await db.saveUserName(' Zeynep ');
+    await syncNotifications(db);
+    String? field(NotifKind k, String key) =>
+        fake.scheduled[idOf(k)]![key] as String?;
+
+    expect(field(NotifKind.lead, 'title'), 'Zeynep, birazdan ilaç vakti');
+    expect(field(NotifKind.due, 'title'), 'Zeynep, ilaç vaktin geldi');
+    expect(field(NotifKind.due, 'body'), startsWith('Metformin · '));
+    expect(
+      field(NotifKind.nag, 'title'),
+      'Zeynep, sanırım ilacını almayı unuttun',
+    );
+    expect(field(NotifKind.nag, 'body'), contains('henüz işaretlenmedi'));
+    expect(fake.scheduled[0]?['title'], 'Zeynep, hatırlatmaların sürsün');
+
+    // Boş ad: genel metinlere dönülür.
+    await db.saveUserName('   ');
+    await syncNotifications(db);
+    expect(field(NotifKind.due, 'title'), 'İlaç zamanı: Metformin');
+  });
+
+  test('alarm modunda doz saati alarm sesli alarm kanalında çalar', () async {
     await db.saveNotificationPrefs(const NotificationPrefs(callMode: true));
     await syncNotifications(db);
     Map<Object?, Object?> specifics(NotifKind k) =>
         fake.scheduled[idOf(k)]!['platformSpecifics'] as Map<Object?, Object?>;
 
-    expect(specifics(NotifKind.due)['channelId'], 'call_alarms');
+    expect(specifics(NotifKind.due)['channelId'], 'dose_alarms');
     // Alarm akışı: telefon sessizdeyken de çalar (iOS AlarmKit gibi).
     expect(
       specifics(NotifKind.due)['audioAttributesUsage'],
       AudioAttributesUsage.alarm.value,
     );
     expect(specifics(NotifKind.due)['fullScreenIntent'], isFalse);
-    // Zil sesi kullanan eski kanal silinir.
+    expect(specifics(NotifKind.due)['sound'], contains('alarm_alert'));
+    // Zil sesi kullanan eski kanallar silinir.
     expect(
       fake.calls
           .where((c) => c.method == 'deleteNotificationChannel')
           .map((c) => c.arguments),
-      contains('calls'),
+      containsAll(['calls', 'call_alarms']),
     );
     expect(
       fake.scheduled[idOf(NotifKind.due)]!['payload'],
@@ -90,13 +113,13 @@ void main() {
     expect(specifics(NotifKind.lead)['channelId'], 'doses');
     expect(specifics(NotifKind.nag)['channelId'], 'doses');
 
-    // "Reddet" ertelemeyle aynıdır; erteleme bildirimi de arama olur.
+    // Alarmdaki "Ertele" de ertelemedir; erteleme bildirimi de alarm olur.
     await handleNotificationAction(db, actionDecline, '${payload()}|call');
-    expect(specifics(NotifKind.snooze)['channelId'], 'call_alarms');
+    expect(specifics(NotifKind.snooze)['channelId'], 'dose_alarms');
     expect((await db.loadSnoozes()).keys, [(medId, doseAt)]);
   });
 
-  test('iOS alarmında "Reddet" erteler, "Kabul et" bildirilir', () async {
+  test('iOS alarmında "Ertele" erteler, "Aç" bildirilir', () async {
     const channel = MethodChannel('takeapill/call');
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -125,13 +148,13 @@ void main() {
     expect(fake.scheduled.keys, contains(idOf(NotifKind.snooze)));
   });
 
-  test('bildirim butonu, bekleyen iOS "Reddet"ini önce uygular', () async {
+  test('bildirim butonu, bekleyen iOS "Ertele"sini önce uygular', () async {
     const channel = MethodChannel('takeapill/call');
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
 
-    // Uygulama kapalıyken alarmda "Reddet"e basıldı, işlem henüz işlenmedi.
+    // Uygulama kapalıyken alarmda "Ertele"ye basıldı, işlem henüz işlenmedi.
     final p = encodePayload(medId, doseAt, call: true);
     final ms = DateTime.now().millisecondsSinceEpoch;
     var pending = ['decline|$p|$ms'];

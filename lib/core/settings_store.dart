@@ -20,6 +20,16 @@ abstract final class SettingKeys {
   static const themeMode = 'theme.mode';
   static const reviewAskedAt = 'review.askedAt';
   static const reviewAskCount = 'review.count';
+  static const userName = 'user.name';
+}
+
+/// Selamlama ve bildirimlerde kullanılan ad için sınır.
+const userNameMaxLength = 20;
+
+/// Fazla boşlukları atar; boş ad null olur.
+String? cleanUserName(String? raw) {
+  final name = raw?.trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
+  return name.isEmpty ? null : name;
 }
 
 extension SettingsAccess on AppDatabase {
@@ -60,6 +70,17 @@ extension SettingsAccess on AppDatabase {
     await setSetting(SettingKeys.nagMinutes, '${p.nagMinutes}');
     await setSetting(SettingKeys.snoozeMinutes, '${p.snoozeMinutes}');
     await setSetting(SettingKeys.callMode, p.callMode ? '1' : '0');
+  }
+
+  /// Kullanıcının adı; girilmediyse null.
+  Future<String?> loadUserName() async =>
+      cleanUserName(await getSetting(SettingKeys.userName));
+
+  /// Temizlenmiş adı kaydeder ve döner; boş ad kaydı siler.
+  Future<String?> saveUserName(String raw) async {
+    final name = cleanUserName(raw);
+    await setSetting(SettingKeys.userName, name ?? '');
+    return name;
   }
 
   /// Ertelemeler `[[ilaç, dozMs, ertelemeMs], ...]` olarak saklanır; böylece

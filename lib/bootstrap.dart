@@ -34,9 +34,10 @@ Future<Widget> bootstrap({AppDatabase? db}) async {
   final theme = parseThemeMode(
     await database.getSetting(SettingKeys.themeMode),
   );
+  final userName = await database.loadUserName();
   if (onboarded) {
-    // Kapalıyken iOS alarmında basılan "Reddet"ler planlanmadan önce ertelensin;
-    // "Kabul et" için ek iş yok, uygulama zaten Bugün'de açılır.
+    // Kapalıyken iOS alarmında basılan "Ertele"ler planlanmadan önce uygulansın;
+    // "Aç" için ek iş yok, uygulama zaten Bugün'de açılır.
     await NotificationService.applyAlarmActions(database);
     // Plan yenilenemese de uygulama açılmalı; bir sonraki açılışta tekrar denenir.
     await trySyncNotifications(database);
@@ -47,6 +48,7 @@ Future<Widget> bootstrap({AppDatabase? db}) async {
     overrides: [
       dbProvider.overrideWithValue(database),
       initialThemeModeProvider.overrideWithValue(theme),
+      initialUserNameProvider.overrideWithValue(userName),
     ],
     child: glass
         ? LiquidGlassWidgets.wrap(

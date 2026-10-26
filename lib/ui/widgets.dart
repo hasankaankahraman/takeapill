@@ -1,17 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import 'med_icons.dart';
 import 'theme.dart';
-
-/// Android saat diyaloğu; seçilen saati gece yarısından itibaren dakika döner.
-/// iOS'ta saat satır içi çarkla seçilir (bkz. TimeRow).
-Future<int?> pickMinutes(BuildContext context, int current) async {
-  final t = await showTimePicker(
-    context: context,
-    initialTime: TimeOfDay(hour: (current ~/ 60) % 24, minute: current % 60),
-  );
-  return t == null ? null : t.hour * 60 + t.minute;
-}
 
 /// Android takvim diyaloğu.
 Future<DateTime?> pickDate(BuildContext context, DateTime initial) =>
@@ -110,10 +101,17 @@ class PageHeader extends StatelessWidget {
                     ),
                   ),
                 ),
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.headlineLarge
-                      ?.copyWith(fontSize: 32, height: 1.15),
+                // Uzun başlık ("İyi akşamlar, Zeynep") tek satıra sığsın diye
+                // küçülür; buton ve liste yerinden oynamaz.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    style: Theme.of(context).textTheme.headlineLarge
+                        ?.copyWith(fontSize: 32, height: 1.15),
+                  ),
                 ),
               ],
             ),
@@ -301,11 +299,17 @@ class Tag extends StatelessWidget {
   );
 }
 
-/// İlacın renkli ikon kutusu.
+/// İlacın renkli ikon kutusu; ikon ilacın formundan gelir.
 class MedBadge extends StatelessWidget {
-  const MedBadge({super.key, required this.color, this.size = 44});
+  const MedBadge({
+    super.key,
+    required this.color,
+    this.form = 'pill',
+    this.size = 44,
+  });
 
   final int color;
+  final String form;
   final double size;
 
   @override
@@ -318,7 +322,8 @@ class MedBadge extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(size * 0.3),
       ),
-      child: Icon(Icons.medication_outlined, color: fg, size: size * 0.5),
+      alignment: Alignment.center,
+      child: MedFormIcon(form: form, color: fg, size: size * 0.55),
     );
   }
 }

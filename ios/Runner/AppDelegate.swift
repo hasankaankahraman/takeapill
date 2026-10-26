@@ -16,7 +16,7 @@ import flutter_local_notifications
     // Bildirim butonlarının arka plan isolate'inde çalışması için gerekli.
     FlutterLocalNotificationsPlugin.setPluginRegistrantCallback { registry in
       GeneratedPluginRegistrant.register(with: registry)
-      // Arka plandaki senkron da arama alarmlarını yeniden kurabilsin.
+      // Arka plandaki senkron da ilaç alarmlarını yeniden kurabilsin.
       if let registrar = registry.registrar(forPlugin: "CallAlarms") {
         CallAlarms.register(messenger: registrar.messenger(), main: false)
       }

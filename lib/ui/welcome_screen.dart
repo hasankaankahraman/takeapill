@@ -66,6 +66,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     // Bildirim izni yoksa alarm ayarları ekranına göndermenin anlamı yok.
     if (ok && mounted) await askExactAlarms(context);
     if (ok && _call) await NotificationService.requestCallPermission();
+    if (ok && _call && mounted) await askFullScreenAlarms(context);
     await db.setSetting(SettingKeys.onboarded, '1');
     if (mounted) context.go('/');
   }

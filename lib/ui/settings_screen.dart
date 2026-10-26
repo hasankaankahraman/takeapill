@@ -232,6 +232,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                     onChanged: (v) async {
                       // Önce izin: plan, izne göre alarm ya da bildirimle kurulur.
                       if (v) await NotificationService.requestCallPermission();
+                      if (v && mounted) await askFullScreenAlarms(context);
                       await _savePrefs(p.copyWith(call: v));
                       await _refreshPermissions();
                     },
@@ -266,6 +267,9 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                     onTap: () async {
                       final ok = await NotificationService.requestPermissions();
                       if (ok && mounted) await askExactAlarms(context);
+                      if (ok && p.callMode && mounted) {
+                        await askFullScreenAlarms(context);
+                      }
                       await _refreshPermissions();
                       if (!mounted) return;
                       // Alarm izni yeni açıldıysa plan tam zamanlıya geçsin.

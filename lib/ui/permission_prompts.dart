@@ -19,3 +19,24 @@ Future<void> askExactAlarms(BuildContext context) async {
   );
   if (go == true) await NotificationService.requestExactAlarms();
 }
+
+/// Android'de alarmın kilit ekranında tam ekran açılması için gereken izinler.
+/// Xiaomi/Redmi (MIUI) bunları varsayılan olarak kapalı tutar ve sistem
+/// penceresi çıkarmaz; kullanıcı uygulama izinlerinden elle açmalıdır.
+Future<void> askFullScreenAlarms(BuildContext context) async {
+  final state = await NotificationService.fullScreenState();
+  if (state == null || !context.mounted) return;
+  final go = await confirmDialog(
+    context,
+    title: 'Tam ekran alarm',
+    message: state == 'miui'
+        ? 'Alarmın kilit ekranında tam ekran açılması için Take a Pill '
+              'izinlerinde "Kilit ekranında göster" ve "Arka planda çalışırken '
+              'açılır pencereleri göster" izinlerini aç. Aksi halde alarm yalnızca '
+              'bildirim olarak gelir.'
+        : 'Alarmın kilit ekranında tam ekran açılması için "Tam ekran '
+              'bildirimleri" iznini aç.',
+    confirm: 'Ayarları aç',
+  );
+  if (go == true) await NotificationService.openFullScreenSettings();
+}

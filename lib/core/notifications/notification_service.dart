@@ -31,7 +31,7 @@ const actionAnswer = 'answer';
 const actionDecline = 'decline';
 
 /// Android'de alarm bu süre çalar, sonra susar.
-const _callTimeout = Duration(seconds: 60);
+const _callTimeout = Duration(minutes: 5);
 
 /// iOS 26+'da alarm modunun AlarmKit alarmları (CallAlarms.swift).
 const _callChannel = MethodChannel('takeapill/call');
@@ -169,6 +169,8 @@ NotificationDetails _callDetails() => NotificationDetails(
     audioAttributesUsage: AudioAttributesUsage.alarm,
     additionalFlags: Int32List.fromList([4]),
     vibrationPattern: Int64List.fromList([0, 1000, 1000]),
+    // Kilitliyken tam ekran alarm olarak açılır, açıkken üstte belirir.
+    fullScreenIntent: true,
     timeoutAfter: _callTimeout.inMilliseconds,
     color: const Color(0xFF0F766E),
     actions: const [
@@ -269,7 +271,12 @@ class NotificationService {
         ),
       ),
       onDidReceiveNotificationResponse: (r) {
-        if (_answers(r)) _answered.add(null);
+        if (_answers(r)) {
+          _answered.add(null);
+          // Tam ekran açılışta bildirim kendiliğinden kapanmaz; alarm susmalı.
+          final id = r.id;
+          if (id != null) unawaited(_plugin.cancel(id: id));
+        }
         unawaited(
           _respond(db, r).then((answered) {
             if (answered) _answered.add(null);
@@ -382,6 +389,26 @@ class NotificationService {
   static Future<bool> requestExactAlarms() async {
     await _android?.requestExactAlarmsPermission();
     return exactAlarmsAllowed();
+  }
+
+  /// Android'de tam ekran alarmı engelleyen izin: "miui" (Xiaomi kilit ekranı /
+  /// arka plan açılış izinleri), "system" (Android 14+) ya da null.
+  static Future<String?> fullScreenState() async {
+    if (_android == null) return null;
+    try {
+      return await _callChannel.invokeMethod<String>('fullScreenState');
+    } on PlatformException catch (e) {
+      debugPrint('Tam ekran durumu alınamadı: $e');
+      return null;
+    }
+  }
+
+  static Future<void> openFullScreenSettings() async {
+    try {
+      await _callChannel.invokeMethod<void>('openFullScreenSettings');
+    } on PlatformException catch (e) {
+      debugPrint('Tam ekran ayarları açılamadı: $e');
+    }
   }
 
   /// Bildirim izni (iOS'ta geçici izin de sayılır); bilinemezse true.

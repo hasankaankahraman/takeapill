@@ -97,7 +97,8 @@ void main() {
       specifics(NotifKind.due)['audioAttributesUsage'],
       AudioAttributesUsage.alarm.value,
     );
-    expect(specifics(NotifKind.due)['fullScreenIntent'], isFalse);
+    // Kilitliyken tam ekran alarm olarak açılır (iOS AlarmKit gibi).
+    expect(specifics(NotifKind.due)['fullScreenIntent'], isTrue);
     expect(specifics(NotifKind.due)['sound'], contains('alarm_alert'));
     // Zil sesi kullanan eski kanallar silinir.
     expect(

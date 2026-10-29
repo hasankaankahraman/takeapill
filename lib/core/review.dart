@@ -9,7 +9,7 @@ import 'settings_store.dart';
 
 /// App Store Connect'teki sayısal uygulama kimliği (Apple ID). Boşken iOS'ta
 /// Ayarlar'daki "Uygulamayı değerlendir" satırı gizlenir.
-const appStoreId = '';
+const appStoreId = '6828241585';
 
 /// Ardışık kaç "tam gün" sonra puan istenir (bugün dahil).
 const reviewStreakDays = 3;

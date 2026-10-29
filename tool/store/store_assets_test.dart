@@ -451,6 +451,23 @@ void main() {
         const _FeatureGraphic(),
         '$_out/google-play/feature-graphic.png',
       );
+
+      // App Store ürün sayfası başlığı (3840 × 1646)
+      t.view.physicalSize = const Size(3840, 1646);
+      t.view.devicePixelRatio = 2;
+      await _render(
+        t,
+        const _HeaderGraphic(),
+        '$_out/app-store/header.png',
+      );
+
+      // App Store arama sonuçları görseli (3840 × 2560)
+      t.view.physicalSize = const Size(3840, 2560);
+      await _render(
+        t,
+        const _HeaderGraphic(height: 1280),
+        '$_out/app-store/search-results.png',
+      );
     });
 
     await t.pumpWidget(const SizedBox());
@@ -1121,6 +1138,112 @@ class _FeatureGraphic extends StatelessWidget {
                 child: const Padding(
                   padding: EdgeInsets.all(10),
                   child: OnboardingArt(page: 0, active: true),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+// --- App Store başlığı ----------------------------------------------------------
+
+/// Öne çıkan görselle aynı dil; Apple'ın güvenli alanı için içerik ortada.
+class _HeaderGraphic extends StatelessWidget {
+  const _HeaderGraphic({this.height = 823});
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 1920,
+    height: height,
+    child: ClipRect(
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: _graphite,
+          ),
+        ),
+        child: Stack(
+          children: [
+            _Blob(
+              center: Offset(1400, height / 2),
+              radius: 700,
+              color: _glow.withValues(alpha: 0.18),
+            ),
+            Positioned(
+              left: 340,
+              top: 0,
+              bottom: 0,
+              width: 640,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(52),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          blurRadius: 60,
+                          offset: const Offset(0, 24),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(52),
+                      child: Image.asset(
+                        'assets/icon/icon.png',
+                        width: 180,
+                        height: 180,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 44),
+                  const Text(
+                    'Take a Pill',
+                    style: TextStyle(
+                      fontSize: 120,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -3,
+                      height: 1.05,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'İlaçlarını unutma.',
+                    style: TextStyle(
+                      fontSize: 52,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.72),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              right: 300,
+              top: 0,
+              bottom: 0,
+              width: 720,
+              child: Theme(
+                data: buildTheme(Brightness.light),
+                child: const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: FittedBox(
+                    child: SizedBox(
+                      width: 250,
+                      height: 250,
+                      child: OnboardingArt(page: 0, active: true),
+                    ),
+                  ),
                 ),
               ),
             ),

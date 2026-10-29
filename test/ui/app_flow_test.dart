@@ -284,6 +284,36 @@ void main() {
     await finish(t, db);
   });
 
+  testWidgets(
+    'alarm modunda tam ekran izni, ayarlara göndermeden önce anlatılır',
+    (t) async {
+      fake.fullScreenState = 'miui';
+      final db = await start(t);
+      for (var i = 0; i < 4; i++) {
+        await t.tap(find.text('Devam'));
+        await settle(t);
+      }
+      await t.tap(find.text('Alarm'));
+      await settle(t);
+      await t.tap(find.text('Devam'));
+      await settle(t);
+      await t.tap(find.text('Başla ve bildirimlere izin ver'));
+      await settle(t);
+      expect(find.text('Tam ekran alarm'), findsOneWidget);
+      expect(
+        fake.calls.map((c) => c.method),
+        isNot(contains('openFullScreenSettings')),
+      );
+      await t.tap(find.text('Ayarları aç'));
+      await settle(t);
+      expect(
+        fake.calls.map((c) => c.method),
+        contains('openFullScreenSettings'),
+      );
+      await finish(t, db);
+    },
+  );
+
   testWidgets('alarmda "Aç" uygulamayı Bugün\'de açar', (t) async {
     await withClock(Clock.fixed(DateTime(2026, 11, 2, 8)), () async {
       final db = await t.runAsync(() async {

@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _channel = MethodChannel('dexterous.com/flutter/local_notifications');
+const _callChannel = MethodChannel('takeapill/call');
 
 /// Bildirim eklentisinin Android tarafını taklit eder: çağrıları kaydeder,
 /// planlanmış bildirimleri tutar.
@@ -16,6 +17,9 @@ class FakeNotifications {
   /// Bildirim izni (Android 13+ POST_NOTIFICATIONS).
   bool notificationsEnabled = true;
 
+  /// Android'de tam ekran alarmı engelleyen izin: null, 'miui' ya da 'system'.
+  String? fullScreenState;
+
   /// Gerçek kanal gibi her yanıtın bir olay döngüsü sürmesini sağlar; sırasız
   /// çalışan iki senkron böylece iç içe geçebilir.
   Duration latency = Duration.zero;
@@ -26,6 +30,7 @@ class FakeNotifications {
   /// flutter test'te platform zaten Android'dir.
   void install() {
     AndroidFlutterLocalNotificationsPlugin.registerWith();
+    _installCallChannel();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, (call) async {
           calls.add(call);
@@ -51,6 +56,16 @@ class FakeNotifications {
         });
   }
 
+  /// Alarm köprüsünün (MainActivity) taklidi. Yanıt verilmezse çağrı sahte
+  /// zamanda hiç dönmez.
+  void _installCallChannel() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_callChannel, (call) async {
+          calls.add(call);
+          return call.method == 'fullScreenState' ? fullScreenState : null;
+        });
+  }
+
   /// Kullanıcının bildirime ya da butonuna dokunmasını taklit eder.
   Future<void> respond({String? actionId, required String payload}) =>
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -69,6 +84,7 @@ class FakeNotifications {
 
   void uninstall() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(_channel, null);
+      ..setMockMethodCallHandler(_channel, null)
+      ..setMockMethodCallHandler(_callChannel, null);
   }
 }

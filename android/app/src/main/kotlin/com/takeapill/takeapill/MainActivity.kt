@@ -1,5 +1,6 @@
 package com.takeapill.takeapill
 
+import android.app.KeyguardManager
 import android.app.NotificationManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
@@ -23,6 +24,9 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "fullScreenState" -> result.success(fullScreenState())
+                    "deviceLocked" -> result.success(
+                        getSystemService(KeyguardManager::class.java).isKeyguardLocked,
+                    )
                     "openFullScreenSettings" -> {
                         openFullScreenSettings()
                         result.success(null)

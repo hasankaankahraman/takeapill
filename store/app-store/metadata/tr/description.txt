@@ -1,4 +1,4 @@
-Take a Pill, ilaçlarını, haplarını ve vitaminlerini zamanında almanı sağlayan sade bir ilaç hatırlatıcı. İlacın saatini, dozunu ve yemekle ilişkisini bir kez gir; zamanı gelince bildirimle ya da alarmla haber verelim. Hesap açman gerekmez, reklam yoktur ve tüm verilerin yalnızca senin cihazında kalır.
+Take a Pill, ilaçlarını, haplarını ve vitaminlerini zamanında almanı sağlayan sade bir ilaç hatırlatıcı. İlacın saatini, dozunu ve yemekle ilişkisini bir kez gir; zamanı gelince bildirimle ya da alarmla haber verelim. Hesap açman gerekmez ve ilaç bilgilerin yalnızca senin cihazında kalır.
 
 SESSİZ MODDA BİLE ÇALAN İLAÇ ALARMI
 Bildirimi kaçıranlar için alarm modu: iOS 26 ve sonrasında ilaç saatinde gerçek bir alarm çalar; kilit ekranında ve Dynamic Island'da görünür, sessiz modu ve Odak'ı aşar. "Ertele" dersen alarm biraz sonra yeniden çalar, "Aç" dersen uygulama açılır ve dozunu tek dokunuşla işaretlersin. Daha eski iOS sürümlerinde hatırlatma sesli bildirim olarak gelir.
@@ -37,7 +37,7 @@ KİMLER İÇİN?
 • D vitamini, demir, omega-3 gibi takviyeleri düzenli almak isteyenler
 
 GİZLİLİK
-Hesap yok, sunucu yok, reklam yok. İlaçların ve geçmişin yalnızca bu cihazda saklanır; hiçbir veri toplanmaz ya da paylaşılmaz.
+Hesap yok. İlaçların ve geçmişin yalnızca bu cihazda saklanır; hiçbir sunucuya gönderilmez. Uygulamada Google AdMob reklamları gösterilir: reklamlar kişiselleştirilmez ve ilaç bilgilerin reklam ağıyla paylaşılmaz. Reklam ağının topladığı veriler Gizlilik Politikası'nda açıklanır.
 
 ÖNEMLİ
 Take a Pill bir hatırlatma aracıdır; tıbbi tavsiye vermez, teşhis ya da tedavi amacı taşımaz. İlaç kullanımınla ilgili kararlar için doktoruna ya da eczacına danış.

@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/notifications/notification_service.dart';
+import 'ui/ad_banner.dart';
 import 'ui/history_screen.dart';
 import 'ui/medication_form.dart';
 import 'ui/medications_screen.dart';
@@ -41,10 +42,17 @@ GoRouter buildRouter({required bool onboarded}) => GoRouter(
         // Liste, yarı saydam alt menünün altından akar.
         extendBody: true,
         body: shell,
-        bottomNavigationBar: AppNavBar(
-          selectedIndex: shell.currentIndex,
-          onSelected: (i) =>
-              shell.goBranch(i, initialLocation: i == shell.currentIndex),
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AdBanner(),
+            AppNavBar(
+              selectedIndex: shell.currentIndex,
+              onSelected: (i) =>
+                  shell.goBranch(i, initialLocation: i == shell.currentIndex),
+            ),
+          ],
         ),
       ),
       branches: [

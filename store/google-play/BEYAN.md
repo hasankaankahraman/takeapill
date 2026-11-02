@@ -1,10 +1,10 @@
 # Take a Pill: Google Play beyan rehberi
 
-Paket: `com.takeapill.takeapill` · Tek dil: tr-TR · Sunucu, hesap, reklam, analitik yok.
+Paket: `com.takeapill.takeapill` · Tek dil: tr-TR · Sunucu, hesap, analitik yok · Reklam: Google AdMob (kişiselleştirilmemiş banner).
 
 ## 1. Uygulama nasıl çalışır
 
-Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirimle yapılır; ağ isteği yoktur.
+Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirimle yapılır. Tek ağ trafiği AdMob reklam SDK'sınındır; hatırlatmalar ona bağlı değildir.
 
 1. **Onboarding** ([welcome_screen.dart](../../lib/ui/welcome_screen.dart)): ad (isteğe bağlı), yemek saatleri, hatırlatma şekli (bildirim ya da alarm), bildirim izni, "Alarmlar ve hatırlatıcılar" izni.
 2. **İlaç ekleme** ([medication_form.dart](../../lib/ui/medication_form.dart)): ad, tür, doz, yemek ilişkisi, program, kür tarihleri.
@@ -14,6 +14,7 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirimle yapı
    - Alarm modu: `dose_alarms` kanalı; telefonun alarm sesi **alarm ses akışında** çalar (sessiz/titreşimde de duyulur), `FLAG_INSISTENT` ile tekrar eder, en fazla 5 dakika sonra susar. Kilitliyken tam ekran bildirim olarak açılır ([MainActivity.kt](../../android/app/src/main/kotlin/com/takeapill/takeapill/MainActivity.kt) kilit ekranı üstünde gösterir, ekranı yakar). Butonlar: "Ertele" / "Aç".
 5. **Bugün / Geçmiş**: dozu işaretleme, uyum oranı.
 6. **Puan isteği** ([review.dart](../../lib/core/review.dart)): Play In-App Review, 3 ardışık tam günden sonra, en fazla 3 kez.
+7. **Reklam** ([ads.dart](../../lib/core/ads.dart), [ad_banner.dart](../../lib/ui/ad_banner.dart)): alt menünün üstünde 320×50 banner; yalnızca onboarding'den sonra. AB/BK'da önce UMP izin formu. Alarm uygulamayı kilit ekranı üstünde açtığında banner kaldırılır (Play "Lockscreen Monetization" kuralı).
 
 ## 2. Bileşen adları
 
@@ -25,21 +26,22 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirimle yapı
 | Manifest | `ActionBroadcastReceiver` | bildirim butonları (Aldım/Ertele/Atla) |
 | Kanallar | `doses`, `dose_alarms` | bildirim / alarm (eski `calls`, `call_alarms` açılışta silinir) |
 | Dart | `NotificationService`, `planNotifications`, `AppDatabase` (`Medications`, `Schedules`, `DoseEvents`, `Settings`), `DoseGenerator`, `RuleCodec`, `maybeRequestReview` | iOS rehberindeki ile aynı |
-| Paketler | `flutter_local_notifications`, `timezone`, `flutter_timezone`, `drift`, `sqlite3_flutter_libs`, `in_app_review` | |
+| Paketler | `flutter_local_notifications`, `timezone`, `flutter_timezone`, `drift`, `sqlite3_flutter_libs`, `in_app_review`, `google_mobile_ads` | |
 
-**İzinler** ([AndroidManifest.xml](../../android/app/src/main/AndroidManifest.xml)): `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `VIBRATE`, `USE_FULL_SCREEN_INTENT`. İnternet izni yok.
+**İzinler** ([AndroidManifest.xml](../../android/app/src/main/AndroidManifest.xml)): `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `VIBRATE`, `USE_FULL_SCREEN_INTENT`. AdMob SDK'sı birleştirilmiş manifeste `INTERNET`, `ACCESS_NETWORK_STATE`, `WAKE_LOCK`, `FOREGROUND_SERVICE` ekler. `AD_ID` ve `ACCESS_ADSERVICES_*` izinleri manifestte bilerek kaldırılmıştır.
 
 ## 3. Play Console: beyan edilecekler
 
 **Data safety**
-- "Veri toplamıyor ve paylaşmıyor." Tüm veri cihazda, sunucuya gitmiyor.
-- Şifreleme aktarımda: uygulama ağ kullanmadığı için "uygulanmaz".
+- **"Veri toplamıyor" artık seçilemez.** AdMob SDK'sı ([Google'ın beyan sayfası](https://developers.google.com/admob/android/privacy/play-data-disclosure)) şunları toplar ve paylaşır; amaç reklam, analiz ve sahtecilik önleme: IP adresi (yaklaşık konum), uygulama etkileşimleri, teşhis bilgisi, cihaz kimlikleri (reklam kimliği hariç, izni kaldırıldı; app set ID kalır).
+- Şifreleme aktarımda: Evet (TLS).
+- İlaç bilgisi, ad ve doz geçmişi cihazdan çıkmaz; "Health info" ve "Personal info" işaretlenmez.
 - Veri silme: hesap yok; uygulama silinince veri silinir.
 - Gizlilik politikası URL'si zorunlu.
 
 **App content**
 - **Health apps / Sağlık uygulamaları beyanı**: uygulama sağlık kategorisinde (ilaç hatırlatıcı). Formda "Medication & Treatment" benzeri seçenekte, "ilaç hatırlatma/takip", tıbbi cihaz **değil**, klinik özellik yok olarak işaretleyin.
-- **Reklam**: yok. **Hedef kitle**: 18+ (çocuklara yönelik değil).
+- **Reklam**: var. **Reklam kimliği beyanı**: kullanılmıyor (`AD_ID` izni kaldırıldı). **Hedef kitle**: 18+ (çocuklara yönelik değil).
 - **Hükümet / finans / haber uygulaması**: hayır.
 
 **Özel izin beyanları (Policy → App content)**
@@ -51,17 +53,20 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirimle yapı
 
 ## 4. Beyan ETMEMENİZ gerekenler (yanlış beyan riski)
 
-- **Veri toplama beyan etmeyin.** "Health info", "Personal info (ad)", "App activity" gibi satırları toplanıyor diye işaretlemek yanlış olur; hepsi cihazda kalır.
+- **İlaç verisini toplanmış gibi beyan etmeyin.** "Health info" ve "Personal info (ad)" cihazda kalır. Reklam SDK'sının topladıkları yukarıdaki Data safety bölümünde.
 - **`USE_EXACT_ALARM` ekleme ve beyan etmeyin.** Bu izin yalnızca ana işlevi alarm saati/takvim olan uygulamalara yasak olmadan verilir; "ilaç hatırlatıcı" bu şartı garanti etmez ve politika ihlaline yol açabilir. Mevcut `SCHEDULE_EXACT_ALARM` yeterli.
 - **Tıbbi cihaz, teşhis, tedavi, doz önerisi, ilaç etkileşimi iddiası yok.** Health apps formunda "tıbbi cihaz / klinik karar destek" işaretlemeyin; mağaza metninde de kullanmayın.
 - **Health Connect kullanmıyorsunuz.** İzin, Health Connect beyanı ya da Health Connect Data safety satırı eklemeyin.
-- **Arka plan / foreground service / `WAKE_LOCK` beyan etmeyin.** Yok.
-- **Reklam, uygulama içi satın alma, abonelik, hesap silme akışı beyan etmeyin.** Yok; hesap olmadığı için "hesap silme URL'si" gerekmez.
+- **Arka plan / foreground service özelliği beyan etmeyin.** Uygulamanın kendi kullanımı yok; `WAKE_LOCK` ve `FOREGROUND_SERVICE` reklam SDK'sının bağımlılıklarından gelir. Console soru sorarsa buna göre yanıtlayın.
+- **Uygulama içi satın alma, abonelik, hesap silme akışı beyan etmeyin.** Yok; hesap olmadığı için "hesap silme URL'si" gerekmez.
 - **Bulut yedekleme / cihazlar arası senkron iddia etmeyin.** Yok. (Manifest'te `allowBackup` kapatılmadıysa Android otomatik yedeği veritabanını Google Drive'a yedekleyebilir; bkz. aşağıda.)
 - **"Rahatsız Etmeyin'i aşar" garantisi vermeyin.** Alarm akışı DND'de varsayılan olarak çalar, ama kullanıcı "alarmlara izin ver"i kapatmış olabilir.
 
 ## 5. Riskler ve yayın öncesi kontrol
 
+- **AdMob:** Uygulamayı ve banner birimini oluşturun; birimi `androidBannerUnit`'e ([ads.dart](../../lib/core/ads.dart)), App ID'yi `APPLICATION_ID` meta-data'sına ([AndroidManifest.xml](../../android/app/src/main/AndroidManifest.xml)) yazın. Şu an Google'ın test App ID'si durur ve birim boştur: release derlemesinde reklam gösterilmez.
+- **AdMob konsolu:** GDPR mesajını yayınlayın (yoksa AB/BK'da izin formu açılmaz, reklam da gelmez); ilaç, takviye ve doğum kontrolü gibi hassas reklam kategorilerini engelleyin.
+- Kilit ekranı davranışını gerçek Android cihazda alarm modunda test edin: alarmdan açılınca banner görünmemeli.
 - **USE_FULL_SCREEN_INTENT çelişkisi.** Önceki commit (`ced57ca`) bu izni Play politikası gereği bilerek kaldırmıştı; bu çalışmada alarmın kilit ekranında iOS gibi açılması için geri eklendi. Seçenekler: (a) izni tutup Console beyanını yukarıdaki gibi yapmak ve reddedilirse geri almak, (b) izni kaldırıp alarmı yalnızca yüksek öncelikli, sesli bildirim olarak bırakmak. Karar sizin; (b) en düşük inceleme riskidir.
 - [README.md](../../README.md) hâlâ "60 sn sonra susar, tam ekran alarm yok" diyor; karar verince güncelleyin.
 - `android:allowBackup` manifestte açıkça belirtilmemiş (varsayılan true). İlaç verisinin Google yedeğine girmesini istemiyorsanız `android:allowBackup="false"` ekleyin; mevcut "veri yalnızca cihazda" metniyle tutarlı kalmak için önerilir.

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/ads.dart';
 import '../core/notifications/notification_planner.dart';
 import '../core/notifications/notification_service.dart';
 import '../core/review.dart';
@@ -139,6 +140,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
 
   Widget _content(MealTimes m, NotificationPrefs p) {
     final c = context.c;
+    final adPrivacy = ref.watch(adPrivacyOptionsProvider).value ?? false;
     Widget meal(String title, int value, MealTimes Function(int) copy) =>
         TimeRow(
           title: title,
@@ -364,26 +366,43 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                     style: TextStyle(fontSize: 12, color: c.warn),
                   ),
                 ),
-              if (canOpenStoreListing) ...[
+              if (canOpenStoreListing || adPrivacy) ...[
                 const SectionLabel('Destek'),
                 GroupPanel(
                   children: [
-                    PanelRow(
-                      leading: Icon(Icons.star_outline_rounded, color: c.muted),
-                      title: 'Uygulamayı değerlendir',
-                      trailing: Icon(
-                        Icons.chevron_right_rounded,
-                        color: c.muted,
+                    if (canOpenStoreListing)
+                      PanelRow(
+                        leading: Icon(
+                          Icons.star_outline_rounded,
+                          color: c.muted,
+                        ),
+                        title: 'Uygulamayı değerlendir',
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: c.muted,
+                        ),
+                        onTap: () async {
+                          try {
+                            await openStoreListing();
+                          } catch (e) {
+                            debugPrint('Mağaza sayfası açılamadı: $e');
+                            if (mounted) _snack('Mağaza sayfası açılamadı.');
+                          }
+                        },
                       ),
-                      onTap: () async {
-                        try {
-                          await openStoreListing();
-                        } catch (e) {
-                          debugPrint('Mağaza sayfası açılamadı: $e');
-                          if (mounted) _snack('Mağaza sayfası açılamadı.');
-                        }
-                      },
-                    ),
+                    if (adPrivacy)
+                      PanelRow(
+                        leading: Icon(
+                          Icons.privacy_tip_outlined,
+                          color: c.muted,
+                        ),
+                        title: 'Reklam gizlilik seçenekleri',
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: c.muted,
+                        ),
+                        onTap: showAdPrivacyOptions,
+                      ),
                   ],
                 ),
               ],
@@ -398,7 +417,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                 child: Text(
                   'Bu uygulama bir hatırlatma aracıdır; tıbbi tavsiye vermez. '
                   'İlaç kullanımınla ilgili kararları doktorun veya eczacınla ver. '
-                  'Verilerin yalnızca bu cihazda saklanır.',
+                  'İlaç bilgilerin yalnızca bu cihazda saklanır.',
                   style: TextStyle(fontSize: 13, height: 1.45, color: c.onNote),
                 ),
               ),

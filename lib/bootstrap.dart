@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'app.dart';
+import 'core/ads.dart';
 import 'core/db/app_database.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/settings_store.dart';
@@ -49,6 +50,10 @@ Future<Widget> bootstrap({AppDatabase? db}) async {
       dbProvider.overrideWithValue(database),
       initialThemeModeProvider.overrideWithValue(theme),
       initialUserNameProvider.overrideWithValue(userName),
+      // Testler (db verir) reklam SDK'sına dokunmaz.
+      adsEnabledProvider.overrideWithValue(
+        db == null && bannerAdUnit(defaultTargetPlatform) != null,
+      ),
     ],
     child: glass
         ? LiquidGlassWidgets.wrap(

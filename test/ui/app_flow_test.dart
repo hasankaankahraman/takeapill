@@ -14,8 +14,23 @@ import 'package:takeapill/core/settings_store.dart';
 import 'package:takeapill/features/schedule/domain/rule_codec.dart';
 import 'package:takeapill/features/schedule/domain/schedule_models.dart';
 import 'package:takeapill/ui/widgets.dart';
+import 'package:url_launcher_platform_interface/link.dart';
+import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
 import '../helpers/fake_notifications.dart';
+
+class _FakeUrlLauncher extends UrlLauncherPlatform {
+  final opened = <(String, PreferredLaunchMode)>[];
+
+  @override
+  LinkDelegate? get linkDelegate => null;
+
+  @override
+  Future<bool> launchUrl(String url, LaunchOptions options) async {
+    opened.add((url, options.mode));
+    return true;
+  }
+}
 
 /// Gerçek fontlar: Ahem test fontuyla taşmalar gerçeği yansıtmaz.
 Future<void> _loadFonts() async {
@@ -222,6 +237,32 @@ void main() {
       });
     },
   );
+
+  testWidgets('Ayarlar gizlilik politikasını tarayıcıda açar', (t) async {
+    final previous = UrlLauncherPlatform.instance;
+    final launcher = _FakeUrlLauncher();
+    UrlLauncherPlatform.instance = launcher;
+    addTearDown(() => UrlLauncherPlatform.instance = previous);
+
+    final db = await t.runAsync(() => seeded([8 * 60])) as AppDatabase;
+    await start(t, db: db);
+    await t.tap(find.text('Ayarlar'));
+    await settle(t);
+
+    final row = find.text('Gizlilik Politikası');
+    await t.ensureVisible(row);
+    await settle(t);
+    await t.tap(row);
+    await settle(t);
+
+    expect(launcher.opened, [
+      (
+        'https://hasankaankahraman.github.io/takeapill/privacy.html',
+        PreferredLaunchMode.externalApplication,
+      ),
+    ]);
+    await finish(t, db);
+  });
 
   testWidgets('Ayarlar\'dan silinen adla genel başlık ve bildirimler', (
     t,

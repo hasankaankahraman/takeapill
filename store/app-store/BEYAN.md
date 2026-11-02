@@ -28,7 +28,7 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirim ya da a
 | Dart | `AppDatabase` (drift): `Medications`, `Schedules`, `DoseEvents`, `Settings` | yerel depo |
 | Dart | `DoseGenerator`, `RuleCodec` | kural → doz saatleri |
 | Dart | `maybeRequestReview` | akıllı puan isteği |
-| Paketler | `flutter_local_notifications`, `timezone`, `flutter_timezone`, `drift`, `sqlite3_flutter_libs`, `in_app_review`, `flutter_riverpod`, `go_router`, `liquid_glass_widgets`, `path_provider` | |
+| Paketler | `flutter_local_notifications`, `timezone`, `flutter_timezone`, `drift`, `sqlite3_flutter_libs`, `in_app_review`, `url_launcher`, `flutter_riverpod`, `go_router`, `liquid_glass_widgets`, `path_provider` | |
 | Kanal | `takeapill/call` | Dart ↔ Swift köprüsü |
 
 ## 3. App Store Connect: beyan edilecekler
@@ -36,7 +36,7 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirim ya da a
 **App Privacy (Gizlilik Etiketleri)**
 - "Data Not Collected" (Veri Toplanmıyor). Ad ve ilaç bilgisi cihazdan çıkmaz, bu yüzden "toplanan veri" sayılmaz.
 - Tracking: Hayır. `PrivacyInfo.xcprivacy` zaten `NSPrivacyTracking=false`, toplanan veri tipi boş.
-- Privacy Policy URL zorunlu: "veri toplamıyoruz, hepsi cihazda" diyen bir sayfa yayınlayın.
+- Privacy Policy URL zorunlu: `https://hasankaankahraman.github.io/takeapill/privacy.html` (GitHub Pages, `main` / `docs`). Aynı sayfa uygulamada Ayarlar > Destek > "Gizlilik Politikası" satırından açılır (Guideline 5.1.1(i)). Göndermeden önce sayfanın açıldığını doğrulayın.
 
 **Required Reason API** (`PrivacyInfo.xcprivacy`'de zaten var): `FileTimestamp` (C617.1) ve `DiskSpace` (E174.1), sqlite için. Sürüm yüklemeden önce `flutter build ipa` çıktısında uyarı olmadığını kontrol edin.
 

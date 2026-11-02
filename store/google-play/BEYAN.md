@@ -25,7 +25,7 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirimle yapı
 | Manifest | `ActionBroadcastReceiver` | bildirim butonları (Aldım/Ertele/Atla) |
 | Kanallar | `doses`, `dose_alarms` | bildirim / alarm (eski `calls`, `call_alarms` açılışta silinir) |
 | Dart | `NotificationService`, `planNotifications`, `AppDatabase` (`Medications`, `Schedules`, `DoseEvents`, `Settings`), `DoseGenerator`, `RuleCodec`, `maybeRequestReview` | iOS rehberindeki ile aynı |
-| Paketler | `flutter_local_notifications`, `timezone`, `flutter_timezone`, `drift`, `sqlite3_flutter_libs`, `in_app_review` | |
+| Paketler | `flutter_local_notifications`, `timezone`, `flutter_timezone`, `drift`, `sqlite3_flutter_libs`, `in_app_review`, `url_launcher` | |
 
 **İzinler** ([AndroidManifest.xml](../../android/app/src/main/AndroidManifest.xml)): `POST_NOTIFICATIONS`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `VIBRATE`, `USE_FULL_SCREEN_INTENT`. İnternet izni yok.
 

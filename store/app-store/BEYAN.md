@@ -30,7 +30,7 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirim ya da a
 | Dart | `DoseGenerator`, `RuleCodec` | kural → doz saatleri |
 | Dart | `maybeRequestReview` | akıllı puan isteği |
 | Dart | `gatherAdConsent`, `AdBanner` | reklam izni ve banner |
-| Paketler | `flutter_local_notifications`, `timezone`, `flutter_timezone`, `drift`, `sqlite3_flutter_libs`, `in_app_review`, `google_mobile_ads`, `flutter_riverpod`, `go_router`, `liquid_glass_widgets`, `path_provider` | |
+| Paketler | `flutter_local_notifications`, `timezone`, `flutter_timezone`, `drift`, `sqlite3_flutter_libs`, `in_app_review`, `google_mobile_ads`, `url_launcher`, `flutter_riverpod`, `go_router`, `liquid_glass_widgets`, `path_provider` | |
 | Kanal | `takeapill/call` | Dart ↔ Swift köprüsü |
 
 ## 3. App Store Connect: beyan edilecekler
@@ -49,7 +49,7 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirim ya da a
 | Crash Data | Hayır | Hayır | Analytics |
 
 - **Tracking: açık karar.** Uygulama ATT izni istemez, `NSUserTrackingUsageDescription` yoktur, reklamlar kişiselleştirilmez; bu yüzden IDFA'ya erişilmez ve uygulamanın kendi `PrivacyInfo.xcprivacy` dosyası `NSPrivacyTracking=false` kalır. Ancak SDK manifesti Device ID'yi "takip" olarak işaretliyor. Yüklemeden önce Xcode'un Privacy Report çıktısına ve Google'ın [veri beyanı sayfasına](https://developers.google.com/admob/ios/privacy/data-disclosure) bakıp son kararı verin. Takip beyan edilirse Apple ATT penceresi de bekler.
-- Privacy Policy URL zorunlu: [docs/privacy.html](../../docs/privacy.html) reklam bölümüyle güncellendi; reklamlı sürüm incelemeye gitmeden önce yayında olmalı.
+- Privacy Policy URL zorunlu: `https://hasankaankahraman.github.io/takeapill/privacy.html` (GitHub Pages, `main` / `docs`). Aynı sayfa uygulamada Ayarlar > Destek > "Gizlilik Politikası" satırından açılır (Guideline 5.1.1(i)). Göndermeden önce sayfanın açıldığını doğrulayın.
 - Yaş derecelendirme anketinde "uygulamada reklam var" işaretleyin.
 
 **Required Reason API** (`PrivacyInfo.xcprivacy`'de zaten var): `FileTimestamp` (C617.1) ve `DiskSpace` (E174.1), sqlite için. Sürüm yüklemeden önce `flutter build ipa` çıktısında uyarı olmadığını kontrol edin.

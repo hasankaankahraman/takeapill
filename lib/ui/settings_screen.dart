@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/ads.dart';
 import '../core/notifications/notification_planner.dart';
@@ -14,6 +15,9 @@ import 'permission_prompts.dart';
 import 'providers.dart';
 import 'theme.dart';
 import 'widgets.dart';
+
+const _privacyPolicyUrl =
+    'https://hasankaankahraman.github.io/takeapill/privacy.html';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -366,46 +370,57 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                     style: TextStyle(fontSize: 12, color: c.warn),
                   ),
                 ),
-              if (canOpenStoreListing || adPrivacy) ...[
-                const SectionLabel('Destek'),
-                GroupPanel(
-                  children: [
-                    if (canOpenStoreListing)
-                      PanelRow(
-                        leading: Icon(
-                          Icons.star_outline_rounded,
-                          color: c.muted,
-                        ),
-                        title: 'Uygulamayı değerlendir',
-                        trailing: Icon(
-                          Icons.chevron_right_rounded,
-                          color: c.muted,
-                        ),
-                        onTap: () async {
-                          try {
-                            await openStoreListing();
-                          } catch (e) {
-                            debugPrint('Mağaza sayfası açılamadı: $e');
-                            if (mounted) _snack('Mağaza sayfası açılamadı.');
-                          }
-                        },
+              const SectionLabel('Destek'),
+              GroupPanel(
+                children: [
+                  if (canOpenStoreListing)
+                    PanelRow(
+                      leading: Icon(Icons.star_outline_rounded, color: c.muted),
+                      title: 'Uygulamayı değerlendir',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: c.muted,
                       ),
-                    if (adPrivacy)
-                      PanelRow(
-                        leading: Icon(
-                          Icons.privacy_tip_outlined,
-                          color: c.muted,
-                        ),
-                        title: 'Reklam gizlilik seçenekleri',
-                        trailing: Icon(
-                          Icons.chevron_right_rounded,
-                          color: c.muted,
-                        ),
-                        onTap: showAdPrivacyOptions,
+                      onTap: () async {
+                        try {
+                          await openStoreListing();
+                        } catch (e) {
+                          debugPrint('Mağaza sayfası açılamadı: $e');
+                          if (mounted) _snack('Mağaza sayfası açılamadı.');
+                        }
+                      },
+                    ),
+                  PanelRow(
+                    leading: Icon(Icons.privacy_tip_outlined, color: c.muted),
+                    title: 'Gizlilik Politikası',
+                    trailing: Icon(Icons.chevron_right_rounded, color: c.muted),
+                    onTap: () async {
+                      var ok = false;
+                      try {
+                        ok = await launchUrl(
+                          Uri.parse(_privacyPolicyUrl),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      } catch (e) {
+                        debugPrint('Gizlilik politikası açılamadı: $e');
+                      }
+                      if (!ok && mounted) {
+                        _snack('Gizlilik politikası açılamadı.');
+                      }
+                    },
+                  ),
+                  if (adPrivacy)
+                    PanelRow(
+                      leading: Icon(Icons.tune_rounded, color: c.muted),
+                      title: 'Reklam gizlilik seçenekleri',
+                      trailing: Icon(
+                        Icons.chevron_right_rounded,
+                        color: c.muted,
                       ),
-                  ],
-                ),
-              ],
+                      onTap: showAdPrivacyOptions,
+                    ),
+                ],
+              ),
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(14),

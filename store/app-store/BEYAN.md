@@ -35,36 +35,47 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirim ya da a
 
 ## 3. App Store Connect: beyan edilecekler
 
-**App Privacy (Gizlilik Etiketleri)**
-- **"Data Not Collected" artık seçilemez.** Ad ve ilaç bilgisi cihazdan çıkmaz, ama AdMob SDK'sı veri toplar. SDK'nın kendi manifestine (`GoogleMobileAds.framework/PrivacyInfo.xcprivacy`, SDK 13.11) göre:
+**App Privacy (Gizlilik Etiketleri)**: App Store Connect → App Privacy → Data Collection
 
-| Veri tipi | Kullanıcıya bağlı | Takip | Amaç |
+"Do you or your third-party partners collect data from this app?" → **Yes**. Ad ve ilaç bilgisi cihazdan çıkmaz, ama AdMob SDK'sı veri toplar. Aşağıdaki yedi veri tipini seçin; listede olmayan hiçbir tipi işaretlemeyin. Bağlılık ve amaçlar SDK'nın kendi manifestinden (`GoogleMobileAds.framework/PrivacyInfo.xcprivacy`, SDK 13.11) alınmıştır.
+
+| Veri tipi (ASC'deki adı) | Linked to user | Used for tracking | Amaçlar |
 |---|---|---|---|
-| Coarse Location | Evet | Hayır | Third-Party Advertising, Developer Advertising, Analytics |
-| Device ID | Evet | **Evet** (bkz. aşağıda) | Third-Party Advertising, Developer Advertising, Analytics |
-| Advertising Data | Evet | Hayır | Third-Party Advertising, Developer Advertising, Analytics |
-| Product Interaction | Evet | Hayır | Third-Party Advertising, Developer Advertising, Analytics |
-| Performance Data | Hayır | Hayır | Third-Party Advertising, Developer Advertising, Analytics |
-| Other Diagnostic Data | Hayır | Hayır | Third-Party Advertising, Developer Advertising, Analytics |
-| Crash Data | Hayır | Hayır | Analytics |
+| Location → **Coarse Location** | Yes | **No** | Third-Party Advertising, Developer's Advertising or Marketing, Analytics |
+| Identifiers → **Device ID** | Yes | **No** | Third-Party Advertising, Developer's Advertising or Marketing, Analytics |
+| Usage Data → **Advertising Data** | Yes | **No** | Third-Party Advertising, Developer's Advertising or Marketing, Analytics |
+| Usage Data → **Product Interaction** | Yes | **No** | Third-Party Advertising, Developer's Advertising or Marketing, Analytics |
+| Diagnostics → **Performance Data** | No | **No** | Third-Party Advertising, Developer's Advertising or Marketing, Analytics |
+| Diagnostics → **Other Diagnostic Data** | No | **No** | Third-Party Advertising, Developer's Advertising or Marketing, Analytics |
+| Diagnostics → **Crash Data** | No | **No** | Analytics |
 
-- **Tracking: açık karar.** Uygulama ATT izni istemez, `NSUserTrackingUsageDescription` yoktur, reklamlar kişiselleştirilmez; bu yüzden IDFA'ya erişilmez ve uygulamanın kendi `PrivacyInfo.xcprivacy` dosyası `NSPrivacyTracking=false` kalır. Ancak SDK manifesti Device ID'yi "takip" olarak işaretliyor. Yüklemeden önce Xcode'un Privacy Report çıktısına ve Google'ın [veri beyanı sayfasına](https://developers.google.com/admob/ios/privacy/data-disclosure) bakıp son kararı verin. Takip beyan edilirse Apple ATT penceresi de bekler.
-- Privacy Policy URL zorunlu: `https://hasankaankahraman.github.io/takeapill/privacy.html` (GitHub Pages, `main` / `docs`). Aynı sayfa uygulamada Ayarlar > Destek > "Gizlilik Politikası" satırından açılır (Guideline 5.1.1(i)). Göndermeden önce sayfanın açıldığını doğrulayın.
-- Yaş derecelendirme anketinde "uygulamada reklam var" işaretleyin.
+Sonuç etiketi: "Data Linked to You" + "Data Not Linked to You"; **"Data Used to Track You" boş.**
+
+**Tracking: Hayır (karar verildi, 2026-11-09).**
+- Uygulama ATT izni istemez, `NSUserTrackingUsageDescription` yoktur, `AppTrackingTransparency` çağrılmaz. ATT izni olmadan iOS IDFA'yı sıfır döndürür; reklamlar `nonPersonalizedAds: true` ile istenir ([ads.dart](../../lib/core/ads.dart)). Apple'ın tanımındaki takip (uygulama verisini başka şirketlerin verisiyle birleştirip hedefli reklam ya da veri simsarı) yapılmaz.
+- Uygulamanın kendi `PrivacyInfo.xcprivacy` dosyası `NSPrivacyTracking=false` ve toplanan veri listesi boş kalır; SDK'nın topladıkları SDK'nın kendi manifestindedir.
+- Xcode → Archive → **Generate Privacy Report** çıktısında SDK manifesti yüzünden Device ID yanında "tracking" görülebilir. Bu, SDK'nın ATT izni verilirse yapabileceklerini anlatır. ATT izni olmadığında iOS 17+ SDK'nın `NSPrivacyTrackingDomains` alan adlarına giden istekleri zaten engeller. ASC etiketi uygulamanın gerçek davranışına göre doldurulur.
+- **Uygulamaya ATT penceresi ya da kişiselleştirilmiş reklam eklenirse bu karar geçersiz olur:** Device ID ve Advertising Data "Used for tracking: Yes" olur ve `NSUserTrackingUsageDescription` gerekir.
+
+**Privacy Policy URL** (zorunlu): `https://hasankaankahraman.github.io/takeapill/privacy.html` (GitHub Pages, `main` / `docs`). Aynı sayfa uygulamada Ayarlar → Destek → "Gizlilik Politikası" satırından açılır (Guideline 5.1.1(i)). Sayfada veri sorumlusu ve iletişim adresi (`hasankaan.dev@gmail.com`), AdMob'un topladıkları, takip yapılmadığı, iOS/Android izinleri, yedekleme, saklama/silme ve KVKK/GDPR hakları yer alır. **Reklamlı politika yalnızca reklamlı sürüm incelemeye gönderilirken `main`'e girmeli** (Pages `main`'den yayınlanır).
+
+**Guideline 5.1.3(i) (sağlık verisi reklamda kullanılamaz)**: İlaç adı, doz, program ve geçmiş reklam isteklerine eklenmez (`AdRequest` boş, anahtar kelime ya da içerik URL'si yok). Review Notes'ta bunu açıkça yazın (aşağıda).
+
+**Guideline 5.1.1(ix) / 2.3.12 (açıklama)**: Mağaza açıklaması ve tanıtım metni reklam olduğunu söylüyor ([description.txt](metadata/tr/description.txt)); "reklamsız" ifadesi geçmemeli.
+
+**Guideline 2.5.18 / 4.0 (reklam yerleşimi)**: Banner yalnızca alt menünün üstünde; onboarding, izin pencereleri, doz işaretleme butonları ve AlarmKit alarmı üzerinde reklam yoktur. Banner kazara dokunmaya yol açacak şekilde butonlara yapışık değildir.
+
+**Avrupa (GDPR / DMA)**: AB/BK/İsviçre'de UMP izin formu açılır, Ayarlar → Destek → "Reklam gizlilik seçenekleri" satırı görünür. AdMob → Privacy & messaging → **European regulations** mesajını yayınlayın; yoksa bu bölgelerde form açılmaz ve reklam gelmez.
 
 **Required Reason API** (`PrivacyInfo.xcprivacy`'de zaten var): `FileTimestamp` (C617.1) ve `DiskSpace` (E174.1), sqlite için. Sürüm yüklemeden önce `flutter build ipa` çıktısında uyarı olmadığını kontrol edin.
 
 **Export Compliance**: `ITSAppUsesNonExemptEncryption = false`. Yalnızca standart sistem şifrelemesi kullanılıyor, belge istenmez.
 
-**Age Rating**: Tıbbi/tedavi bilgisi sorusuna dikkat. Uygulama bilgi vermiyor, hatırlatıyor; "Medical/Treatment Information" için yalnızca kullanıcı girdisi olduğunu işaretleyin (sıklık "Infrequent/None" mantığıyla). Yeni 2025 yaş derecelendirme anketini doldurun.
+**Age Rating**: Tıbbi/tedavi bilgisi sorusuna dikkat. Uygulama bilgi vermiyor, hatırlatıyor; "Medical/Treatment Information" için yalnızca kullanıcı girdisi olduğunu işaretleyin (sıklık "Infrequent/None" mantığıyla). 2025 anketindeki reklamla ilgili soruyu (uygulamada reklam var mı) **Evet** yanıtlayın; reklamlar uygulamanın yaş derecesine uygun olmalı (AdMob'da en yüksek reklam içerik derecesini "PG" yapın, aşağıda).
 
 **Info.plist kullanım metni**: `NSAlarmKitUsageDescription` dolu ve gerçek amacı anlatıyor. AlarmKit izin penceresi bu metni gösterir.
 
-**Review Notes** (Apple'a not):
-- "Alarm modu iOS 26+ cihazda AlarmKit kullanır; kilit ekranında test için onboarding'de 'Alarm' seçin, bir ilacı 2 dakika sonrasına kurun."
-- "Hesap yok, giriş gerekmez."
-- "Uygulama Google AdMob ile kişiselleştirilmemiş banner gösterir; ATT istenmez, ilaç bilgisi reklam ağına gönderilmez."
-- Bildirim izni onboarding'de açıklamayla istenir.
+**Review Notes** (Apple'a not): reklamlı sürüm için İngilizce metin [REVIEW_NOTES_ADS.md](REVIEW_NOTES_ADS.md) içinde. [REVIEW_REPLY.md](REVIEW_REPLY.md) yalnızca reklamsız 1.0.0 içindir.
 
 **Kategori**: Health & Fitness ya da Medical. Medical seçerseniz Apple daha sıkı bakar (klinik doğruluk iddiası beklenir); iddiası olmayan bir hatırlatıcı için **Health & Fitness** önerilir.
 
@@ -82,10 +93,24 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirim ya da a
 
 ## 5. Yayın öncesi kontrol
 
-- **AdMob:** Uygulamayı ve banner birimini oluşturun; birimi `iosBannerUnit`'e ([ads.dart](../../lib/core/ads.dart)), App ID'yi `GADApplicationIdentifier`'a ([Info.plist](../../ios/Runner/Info.plist)) yazın. Şu an Google'ın test App ID'si durur ve birim boştur: release derlemesinde reklam gösterilmez.
-- **AdMob konsolu:** GDPR mesajını yayınlayın (yoksa AB/BK'da izin formu açılmaz, reklam da gelmez); ilaç, takviye ve doğum kontrolü gibi hassas reklam kategorilerini engelleyin.
-- [REVIEW_REPLY.md](REVIEW_REPLY.md) yalnızca reklamsız 1.0.0 (build 1) için geçerlidir; reklamlı build'de "advertising: none" diyen 4. maddesi yanlış olur.
+Sıra önemli: iOS 1.0 (reklamsız) onaylanmadan `feat/admob-ads` `main`'e birleştirilmez ve bu daldan iOS derlemesi yüklenmez. Pages `main`'den yayınlandığı için birleştirme canlı gizlilik politikasını hemen reklamlı sürümle değiştirir.
+
+**AdMob konsolu**
+- Uygulamayı (iOS) ve banner birimini oluşturun; birimi `iosBannerUnit`'e ([ads.dart](../../lib/core/ads.dart)), App ID'yi `GADApplicationIdentifier`'a ([Info.plist](../../ios/Runner/Info.plist)) yazın. Şu an Google'ın test App ID'si durur ve birim boştur: release derlemesinde reklam gösterilmez.
+- Uygulamayı App Store kaydına bağlayın (App settings → Link to app store); `app-ads.txt` doğrulaması bunun için gerekir.
+- Privacy & messaging → **European regulations** (GDPR) mesajını yayınlayın. İsteğe bağlı: **US state regulations** mesajı (reklamlar zaten kişiselleştirilmemiş).
+- Blocking controls → Sensitive categories: ilaç/eczane, takviye, kilo verme, doğum kontrolü/cinsel sağlık, kumar, alkol, flört kategorilerini engelleyin. Sağlık uygulamasında ilaç reklamı görünmesi hem yanıltıcı hem inceleme riski.
+- Blocking controls → **Maximum ad content rating: PG**.
+- `app-ads.txt`: [store/admob/README.md](../admob/README.md).
+
+**App Store Connect**
+- App Privacy etiketini yukarıdaki tabloyla güncelleyin ve **yayınlayın** (etiket sürümden bağımsızdır; reklamlı sürüm onaylanmadan önce değiştirmek mevcut reklamsız sürüm için yanlış beyan olur, bu yüzden reklamlı build'i incelemeye gönderirken güncelleyin).
+- Yaş derecelendirme anketindeki reklam sorusunu güncelleyin.
+- Review Notes'a [REVIEW_NOTES_ADS.md](REVIEW_NOTES_ADS.md) metnini yapıştırın.
+- Marketing URL / Support URL: `https://hasankaankahraman.github.io/takeapill/` ve `.../support.html`. AdMob `app-ads.txt`'yi bu alan adının kökünde arar.
 - `06-gizlilik` ekran görüntüleri "reklam yok" demeyecek şekilde yenilendi; yüklerken eskilerini değiştirin.
-- `appStoreId` ([review.dart](../../lib/core/review.dart)) hâlâ boş: Apple ID alınınca doldurun, yoksa "Uygulamayı değerlendir" satırı iOS'ta gizli kalır.
+
+**Derleme**
+- `flutter build ipa` sonrası Xcode Organizer → Generate Privacy Report çıktısını saklayın; SDK manifestleri ve Required Reason API'ler orada görünür.
 - iOS 26 gerektiren AlarmKit kodu `#available(iOS 26.0, *)` arkasında; eski sürümde derleme sorunu çıkarmaz.
 - Ekran görüntüleri [store/app-store/](./) altında (6.9" iPhone, 13" iPad).

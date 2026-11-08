@@ -10,10 +10,14 @@
     <uses-permission android:name="android.permission.ACCESS_ADSERVICES_AD_ID" tools:node="remove"/>
     <uses-permission android:name="android.permission.ACCESS_ADSERVICES_ATTRIBUTION" tools:node="remove"/>
     <uses-permission android:name="android.permission.ACCESS_ADSERVICES_TOPICS" tools:node="remove"/>
+    <!-- İlaç verisi Google bulut yedeğine girmez; Android 12+ kuralları data_extraction_rules.xml içinde. -->
     <application
         android:label="Take a Pill"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="true"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"

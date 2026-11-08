@@ -32,24 +32,52 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirimle yapı
 
 ## 3. Play Console: beyan edilecekler
 
-**Data safety**
-- **"Veri toplamıyor" artık seçilemez.** AdMob SDK'sı ([Google'ın beyan sayfası](https://developers.google.com/admob/android/privacy/play-data-disclosure)) şunları toplar ve paylaşır; amaç reklam, analiz ve sahtecilik önleme: IP adresi (yaklaşık konum), uygulama etkileşimleri, teşhis bilgisi, cihaz kimlikleri (reklam kimliği hariç, izni kaldırıldı; app set ID kalır).
-- Şifreleme aktarımda: Evet (TLS).
-- İlaç bilgisi, ad ve doz geçmişi cihazdan çıkmaz; "Health info" ve "Personal info" işaretlenmez.
-- Veri silme: hesap yok; uygulama silinince veri silinir.
-- Gizlilik politikası URL'si zorunlu.
+### Data safety (Uygulama içeriği → Veri güvenliği)
 
-**App content**
-- **Health apps / Sağlık uygulamaları beyanı**: uygulama sağlık kategorisinde (ilaç hatırlatıcı). Formda "Medication & Treatment" benzeri seçenekte, "ilaç hatırlatma/takip", tıbbi cihaz **değil**, klinik özellik yok olarak işaretleyin.
-- **Reklam**: var. **Reklam kimliği beyanı**: kullanılmıyor (`AD_ID` izni kaldırıldı). **Hedef kitle**: 18+ (çocuklara yönelik değil).
-- **Hükümet / finans / haber uygulaması**: hayır.
+Kaynak: Google'ın [AdMob Play veri beyanı sayfası](https://developers.google.com/admob/android/privacy/play-data-disclosure) (SDK 25.x): IP adresi, uygulama etkileşimleri, teşhis bilgisi ve cihaz kimlikleri "otomatik olarak toplanır ve paylaşılır", amaç reklam, analiz ve sahtecilik önleme. Google "paylaşılır" dediği için aşağıda **Shared: Yes** seçilir (temkinli ve Google'ın beyanıyla tutarlı).
 
-**Özel izin beyanları (Policy → App content)**
-1. **Exact alarm (`SCHEDULE_EXACT_ALARM`)**: Kullanım amacı "ilaç saatinde zamanında hatırlatma; gecikme sağlığı etkileyebilir". Bu izin kullanıcıya bağlı (Android 14+ varsayılan kapalı); uygulama izin yoksa esnek moda düşer ve uyarır. `USE_EXACT_ALARM` kullanmıyoruz; bu yüzden daha sıkı "alarm/takvim uygulaması" şartı yok.
-2. **Full-screen intent (`USE_FULL_SCREEN_INTENT`)**: Play, bu izni yalnızca **alarm veya arama** gibi çekirdek işlevi tam ekran gerektiren uygulamalara verir. Android 14+ için Console'da beyan istenir ve uygun görülmezse izin otomatik iptal edilir. Beyan metni: "Kullanıcının kendi kurduğu ilaç alarmı, telefon kilitliyken alarm saati gibi tam ekran açılır; kullanıcı bunu onboarding'de 'Alarm' modunu seçerek açar." **Bu beyan reddedilebilir (aşağıda risk bölümü).**
-3. **Foreground service, arka plan konumu, SMS, kişiler vb.**: kullanılmıyor, form açmayın.
+**Genel sorular**
+| Soru | Yanıt |
+|---|---|
+| Does your app collect or share any of the required user data types? | **Yes** |
+| Is all of the user data collected by your app encrypted in transit? | **Yes** (SDK trafiği TLS) |
+| Do you provide a way for users to request that their data is deleted? | **No**. Uygulamanın kendi verisi yalnızca cihazdadır ve uygulama silinince silinir; AdMob'un topladığı veriyi geliştirici silemez, Google'ın kendi araçlarıyla yönetilir. Hesap olmadığı için silme URL'si zorunlu değildir. |
+| Hesap oluşturma | Uygulamada hesap yok |
 
-**Foreground service**: yok. Alarm sesi bildirim kanalından çalar.
+**Veri tipleri** (yalnızca bunları işaretleyin)
+| Kategori → Tip | Collected | Shared | Ephemeral | Required / Optional | Amaçlar |
+|---|---|---|---|---|---|
+| Location → **Approximate location** (IP'den) | Yes | Yes | No | Required | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
+| App activity → **App interactions** | Yes | Yes | No | Required | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
+| App info and performance → **Crash logs** | Yes | Yes | No | Required | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
+| App info and performance → **Diagnostics** | Yes | Yes | No | Required | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
+| Device or other IDs → **Device or other IDs** (app set ID; reklam kimliği izni kaldırıldı) | Yes | Yes | No | Required | Advertising or marketing, Analytics, Fraud prevention, security, and compliance |
+
+"Required": SDK bu verileri kullanıcının kapatabileceği bir ayar olmadan toplar (AB'deki UMP izni yalnızca kişiselleştirmeyi ve depolamayı etkiler).
+
+**İşaretlenmeyecekler**: Health and fitness, Personal info (ad), Messages, Photos, Files, Contacts, Calendar, Precise location, Financial info, Web browsing. İlaç verisi, ad ve geçmiş cihazdan çıkmaz; Android bulut yedeği de kapalı ([data_extraction_rules.xml](../../android/app/src/main/res/xml/data_extraction_rules.xml)).
+
+### Diğer Uygulama içeriği formları
+| Form | Yanıt |
+|---|---|
+| **Privacy policy** | `https://hasankaankahraman.github.io/takeapill/privacy.html`. Sayfa Android izinlerini, AdMob'u, veri sorumlusunu ve iletişim adresini içerir; uygulamada Ayarlar → Destek'ten de açılır. |
+| **Ads** | Contains ads: **Yes** |
+| **Advertising ID** | Does your app use advertising ID? **No**. `AD_ID` izni birleştirilmiş manifestten `tools:node="remove"` ile kaldırılmıştır; yüklemeden önce `aapt dump permissions` ya da Play Console → App bundle explorer → Permissions'ta görünmediğini doğrulayın. Bu yanıtla izin uyuşmazsa Play yüklemeyi reddeder. |
+| **Target audience and content** | Yaş grupları: **18 ve üzeri**. "Çocukların ilgisini çekebilir mi?": **Hayır**. Families politikası kapsamı dışında. |
+| **Content rating (IARC)** | Kategori: Utility/Productivity ya da Health. Şiddet, cinsellik, kumar, kullanıcı etkileşimi/sohbet, konum paylaşımı, dijital satın alma: **Hayır**. Reklam varlığı Ads formunda beyan edilir. |
+| **Health apps** | Kategori: ilaç ve tedavi yönetimi (medication reminder). Tıbbi cihaz / klinik karar desteği: **Hayır**. Sağlık verisi cihazda kalır, reklamda kullanılmaz. |
+| **Financial features / Government / News / COVID-19** | Hayır / uygulanamaz |
+
+### Özel izin beyanları (Uygulama içeriği → Hassas izinler)
+1. **Exact alarm (`SCHEDULE_EXACT_ALARM`)**: Kullanım amacı "ilaç saatinde zamanında hatırlatma; gecikme sağlığı etkileyebilir". Bu izin kullanıcıya bağlı (Android 14+ varsayılan kapalı); uygulama izin yoksa esnek moda düşer ve Ayarlar'da uyarır. `USE_EXACT_ALARM` kullanılmaz, bu yüzden "alarm/takvim uygulaması" şartı yoktur.
+2. **Full-screen intent (`USE_FULL_SCREEN_INTENT`)**: `main`'de bilerek kullanılıyor (`c8efd2e`): kullanıcı "Alarm" modunu seçtiğinde ilaç alarmı kilitliyken saat alarmı gibi tam ekran açılır; izin ekranına gitmeden önce nedeni bir pencereyle anlatılır ([permission_prompts.dart](../../lib/ui/permission_prompts.dart)). Beyan seçeneği: **Alarm** ("kullanıcının kurduğu alarmlar"). Beyan metni: "Users set their own medication alarms. In Alarm mode, a due dose rings like a clock alarm and opens full screen over the lock screen so it is not missed; notification mode does not use full-screen intents." Play reddederse izin Android 14+'ta otomatik iptal edilir, alarm yüksek öncelikli sesli bildirim olarak çalışmaya devam eder.
+3. **Foreground service, arka plan konumu, SMS, kişiler, depolama**: uygulama kullanmaz. `FOREGROUND_SERVICE` ve `WAKE_LOCK` AdMob/Play Services bağımlılıklarından gelir; Console foreground service türü sorarsa uygulamanın kendi servisi olmadığını yazın.
+
+### Reklam politikası (Developer Program Policies → Ads)
+- **Lockscreen monetization**: Alarm uygulamayı kilit ekranı üstünde açtığında banner kaldırılır ([ad_banner.dart](../../lib/ui/ad_banner.dart)). Gerçek cihazda doğrulayın.
+- **Disruptive / unexpected ads**: Yalnızca sabit banner; geçiş (interstitial), ödüllü ya da açılış reklamı yok. Onboarding, izin pencereleri, bildirimler ve alarm ekranında reklam yok.
+- **Ads in health apps**: AdMob'da hassas kategorileri ve en yüksek içerik derecesini kısıtlayın (bkz. §5).
+- **Store listing**: Açıklama reklam içerdiğini söylüyor ([full_description.txt](metadata/tr-TR/full_description.txt)); "reklamsız" ifadesi geçmemeli.
 
 ## 4. Beyan ETMEMENİZ gerekenler (yanlış beyan riski)
 
@@ -59,17 +87,25 @@ Tüm veri cihazda SQLite'ta (drift) durur. Hatırlatmalar yerel bildirimle yapı
 - **Health Connect kullanmıyorsunuz.** İzin, Health Connect beyanı ya da Health Connect Data safety satırı eklemeyin.
 - **Arka plan / foreground service özelliği beyan etmeyin.** Uygulamanın kendi kullanımı yok; `WAKE_LOCK` ve `FOREGROUND_SERVICE` reklam SDK'sının bağımlılıklarından gelir. Console soru sorarsa buna göre yanıtlayın.
 - **Uygulama içi satın alma, abonelik, hesap silme akışı beyan etmeyin.** Yok; hesap olmadığı için "hesap silme URL'si" gerekmez.
-- **Bulut yedekleme / cihazlar arası senkron iddia etmeyin.** Yok. (Manifest'te `allowBackup` kapatılmadıysa Android otomatik yedeği veritabanını Google Drive'a yedekleyebilir; bkz. aşağıda.)
+- **Bulut yedekleme / cihazlar arası senkron iddia etmeyin.** Yok. Android otomatik bulut yedeği uygulama verisini dışarıda bırakır ([data_extraction_rules.xml](../../android/app/src/main/res/xml/data_extraction_rules.xml), Android 11 ve öncesi için `fullBackupContent="false"`); kullanıcının başlattığı cihazdan cihaza aktarım açıktır.
 - **"Rahatsız Etmeyin'i aşar" garantisi vermeyin.** Alarm akışı DND'de varsayılan olarak çalar, ama kullanıcı "alarmlara izin ver"i kapatmış olabilir.
 
 ## 5. Riskler ve yayın öncesi kontrol
 
-- **AdMob:** Uygulamayı ve banner birimini oluşturun; birimi `androidBannerUnit`'e ([ads.dart](../../lib/core/ads.dart)), App ID'yi `APPLICATION_ID` meta-data'sına ([AndroidManifest.xml](../../android/app/src/main/AndroidManifest.xml)) yazın. Şu an Google'ın test App ID'si durur ve birim boştur: release derlemesinde reklam gösterilmez.
-- **AdMob konsolu:** GDPR mesajını yayınlayın (yoksa AB/BK'da izin formu açılmaz, reklam da gelmez); ilaç, takviye ve doğum kontrolü gibi hassas reklam kategorilerini engelleyin.
-- Kilit ekranı davranışını gerçek Android cihazda alarm modunda test edin: alarmdan açılınca banner görünmemeli.
-- **USE_FULL_SCREEN_INTENT çelişkisi.** Önceki commit (`ced57ca`) bu izni Play politikası gereği bilerek kaldırmıştı; bu çalışmada alarmın kilit ekranında iOS gibi açılması için geri eklendi. Seçenekler: (a) izni tutup Console beyanını yukarıdaki gibi yapmak ve reddedilirse geri almak, (b) izni kaldırıp alarmı yalnızca yüksek öncelikli, sesli bildirim olarak bırakmak. Karar sizin; (b) en düşük inceleme riskidir.
-- [README.md](../../README.md) hâlâ "60 sn sonra susar, tam ekran alarm yok" diyor; karar verince güncelleyin.
-- `android:allowBackup` manifestte açıkça belirtilmemiş (varsayılan true). İlaç verisinin Google yedeğine girmesini istemiyorsanız `android:allowBackup="false"` ekleyin; mevcut "veri yalnızca cihazda" metniyle tutarlı kalmak için önerilir.
+Sıra: Google Play reklamlı sürümü ilk alır, ama Pages `main`'den yayınlandığı için `feat/admob-ads` iOS 1.0 (reklamsız) onaylanana kadar `main`'e birleştirilmez. Play'e reklamlı sürümü gönderirken canlı gizlilik politikası reklamlı metni göstermeli; yani önce iOS onayı, sonra birleştirme, sonra Play gönderimi.
+
+**AdMob konsolu**
+- Android uygulamasını ve banner birimini oluşturun; birimi `androidBannerUnit`'e ([ads.dart](../../lib/core/ads.dart)), App ID'yi `APPLICATION_ID` meta-data'sına ([AndroidManifest.xml](../../android/app/src/main/AndroidManifest.xml)) yazın. Şu an Google'ın test App ID'si durur ve birim boştur: release derlemesinde reklam gösterilmez.
+- Uygulamayı Play kaydına bağlayın; `app-ads.txt` için [store/admob/README.md](../admob/README.md).
+- Privacy & messaging → **European regulations** mesajını yayınlayın (yoksa AB/BK'da izin formu açılmaz, reklam da gelmez).
+- Blocking controls → Sensitive categories: ilaç/eczane, takviye, kilo verme, doğum kontrolü/cinsel sağlık, kumar, alkol, flört. Maximum ad content rating: **PG**.
+
+**Play Console**
+- Store listing → Contact details: e-posta `hasankaan.dev@gmail.com`, web sitesi `https://hasankaankahraman.github.io/takeapill/` (AdMob `app-ads.txt`'yi bu alan adının kökünde arar).
+- §3'teki Data safety, Ads, Advertising ID, Target audience, Content rating, Health apps ve Full-screen intent formlarını aynı sürümle gönderin.
+
+**Derleme ve cihaz testi**
 - Release imzası `android/key.properties` yoksa debug anahtarıyla atılır; Play'e yüklemeden önce gerçek keystore tanımlayın.
-- Android 14+ ilk kurulumda "Alarmlar ve hatırlatıcılar" ve (reddedilmemişse) tam ekran izni kapalı olabilir; test cihazında Ayarlar → Uygulamalar → Take a Pill'den kontrol edin.
+- Birleştirilmiş manifestte `com.google.android.gms.permission.AD_ID` olmadığını doğrulayın (Advertising ID = No yanıtı buna bağlı).
+- Gerçek Android cihazda: alarm modunda kilit ekranında alarm açılınca banner görünmemeli; Android 14+ ilk kurulumda "Alarmlar ve hatırlatıcılar" ve tam ekran izinleri kapalı olabilir (Ayarlar → Uygulamalar → Take a Pill).
 - Ekran görüntüleri ve grafikler [store/google-play/](./) altında hazır.

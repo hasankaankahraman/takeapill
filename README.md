@@ -33,6 +33,14 @@ lib/
   kapalıdır. İzin yoksa bildirimler esnek modda kurulur (birkaç dakika
   gecikebilir) ve Ayarlar ekranında uyarı görünür. Kullanıcı izin ekranına
   gönderilmeden önce nedeni bir pencereyle anlatılır.
+- Reklam: alt menünün üstünde Google AdMob banner'ı (`lib/core/ads.dart`,
+  `lib/ui/ad_banner.dart`), yalnızca onboarding'den sonra; kişiselleştirilmemiş,
+  isteğe uygulama verisi eklenmez, iOS'ta ATT yok, Android'de `AD_ID` izni
+  kaldırılmış. AB/BK/İsviçre'de önce UMP izin formu. Android'de kilit ekranı
+  üstünde banner kaldırılır. Mağaza beyanları: `store/app-store/BEYAN.md`,
+  `store/google-play/BEYAN.md`.
+- Android bulut yedeği ilaç verisini dışarıda bırakır
+  (`res/xml/data_extraction_rules.xml`); cihazdan cihaza aktarım açık.
 - "Ertele" kalıcıdır: Settings tablosunda saklanır, plan yenilense de korunur.
 - Hatırlatma şekli (onboarding'de seçilir, Ayarlar'dan değişir): bildirim ya
   da alarm. Alarm modunda doz saati ve erteleme hatırlatması "Ertele / Aç"
@@ -44,8 +52,10 @@ lib/
     yazılır, Dart açılışta, öne gelince ve her bildirim butonundan önce işler
     (`applyAlarmActions`). Alarm başlığında yemek notu da yer alır.
   - Android: telefonun alarm sesi alarm akışında çalar (`dose_alarms` kanalı),
-    böylece sessiz/titreşim modunda da duyulur; 60 sn sonra susar. Tam ekran
-    alarm yok (`USE_FULL_SCREEN_INTENT` Play politikası gereği kaldırıldı).
+    böylece sessiz/titreşim modunda da duyulur; kapatılana dek tekrar eder,
+    en geç 5 dk sonra susar. Kilitliyken tam ekran açılır
+    (`USE_FULL_SCREEN_INTENT`, Play Console'da "Alarm" olarak beyan edilir);
+    izin ekranına gönderilmeden önce nedeni anlatılır.
   - Daha eski iOS ya da izin yoksa: `ios/Runner/alarm.caf` sesli bildirim;
     sessiz modda yalnızca titrer.
 

@@ -411,6 +411,18 @@ class NotificationService {
     }
   }
 
+  /// Android'de kilit ekranı açık mı; bilinemezse true (reklam gösterilmesin).
+  /// iOS'ta uygulama kilit ekranının üstünde açılmaz.
+  static Future<bool> deviceLocked() async {
+    if (_android == null) return false;
+    try {
+      return await _callChannel.invokeMethod<bool>('deviceLocked') ?? true;
+    } on PlatformException catch (e) {
+      debugPrint('Kilit durumu alınamadı: $e');
+      return true;
+    }
+  }
+
   /// Bildirim izni (iOS'ta geçici izin de sayılır); bilinemezse true.
   static Future<bool> notificationsEnabled() async {
     try {

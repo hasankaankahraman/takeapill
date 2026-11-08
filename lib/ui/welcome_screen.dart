@@ -154,7 +154,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
               icon: Icons.lock_outline_rounded,
               bg: c.ok.withValues(alpha: 0.14),
               fg: c.ok,
-              text: 'Tüm verilerin yalnızca bu cihazda kalır',
+              text: 'İlaç bilgilerin yalnızca bu cihazda kalır',
             ),
             _Feature(
               icon: Icons.info_outline_rounded,

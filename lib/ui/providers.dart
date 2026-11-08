@@ -4,6 +4,7 @@ import 'package:clock/clock.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/ads.dart';
 import '../core/db/app_database.dart';
 import '../core/notifications/notification_service.dart';
 import '../core/settings_store.dart';
@@ -55,6 +56,15 @@ final medicationPlansProvider =
 final notificationsEnabledProvider = FutureProvider.autoDispose<bool>(
   (_) => NotificationService.notificationsEnabled(),
 );
+
+/// Reklam gösterilecek mi; bootstrap belirler.
+final adsEnabledProvider = Provider<bool>((_) => false);
+
+/// Ayarlar'da reklam gizlilik seçenekleri satırı gerekiyor mu (AB/BK).
+final adPrivacyOptionsProvider = FutureProvider.autoDispose<bool>((ref) async {
+  if (!ref.watch(adsEnabledProvider)) return false;
+  return adPrivacyOptionsRequired();
+});
 
 /// Dozu alındı/atlandı olarak işaretler; null verilirse işareti geri alır.
 Future<void> markDose(AppDatabase db, DoseView v, DoseStatus? status) async {

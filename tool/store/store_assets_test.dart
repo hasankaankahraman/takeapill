@@ -204,8 +204,8 @@ const _shots = [
   ),
   _Shot(
     '06-gizlilik',
-    'Verilerin\nsende kalır.',
-    'Hesap yok, reklam yok.\nHer şey bu cihazda.',
+    'İlaçların\nsende kalır.',
+    'Hesap yok, kayıt yok.\nİlaç bilgilerin bu cihazda.',
     _night,
     route: '/',
     brightness: Brightness.dark,

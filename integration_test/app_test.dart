@@ -277,6 +277,10 @@ void main() {
     expect(await db.getSetting(SettingKeys.themeMode), 'light');
 
     // Önceden haber vermeyi kapat -> "Birazdan" bildirimi kalmaz
+    // Satır ilk açılışta cam menünün altında kalır; dokunuş menüye gider.
+    await scrollTo(t, find.text('Erteleme süresi'));
+    await t.drag(find.text('Erteleme süresi'), const Offset(0, -250));
+    await settle(t, 3);
     await t.tap(find.text('1 dk').first); // ilk eşleşme: "Önceden haber ver"
     await settle(t, 3);
     await t.tap(find.text('Kapalı').last);
